@@ -2,7 +2,7 @@
 
 Eine statische, auf **GitHub Pages** ausführbare 3D-Web-App zum Betrachten von STEP/IGES-Dateien, zur Baugruppeninspektion, zum Ein-/Ausblenden einzelner Komponenten sowie zur Materialgestaltung und zum Export in Mesh-Formate.
 
-Die Anwendung benötigt **kein Backend, keinen Account und keinen API-Schlüssel**. CAD-Dateien werden vom Browser verarbeitet und **nicht an einen eigenen Server hochgeladen**. Wichtig: Die JavaScript-Bibliotheken und die WebAssembly-CAD-Engine werden über das öffentliche CDN `cdn.jsdelivr.net` nachgeladen, insbesondere beim ersten STEP-/IGES-Import. Zum Öffnen muss daher eine Internetverbindung bestehen. Die ausgewählte CAD-Datei selbst wird an das CDN **nicht** hochgeladen.
+Die Anwendung benötigt **kein Backend, keinen Account und keinen API-Schlüssel**. CAD-Dateien werden vom Browser verarbeitet und **nicht an einen eigenen Server hochgeladen**. Wichtig: Die JavaScript-Bibliotheken und die WebAssembly-CAD-Engine werden über die öffentlichen CDNs `cdn.jsdelivr.net` (mit `unpkg.com` als Fallback für die CAD-Engine) nachgeladen, insbesondere beim ersten STEP-/IGES-Import. Zum Öffnen muss daher eine Internetverbindung bestehen. Die ausgewählte CAD-Datei selbst wird an das CDN **nicht** hochgeladen.
 
 ## Direkt auf GitHub Pages veröffentlichen
 
@@ -68,7 +68,7 @@ Dann `http://localhost:8000/` im Browser öffnen. Auch hier ist zum ersten Start
 - `occt-worker.js` – OpenCascade/WASM-Import in Web Worker
 - `.nojekyll` – GitHub-Pages-Kompatibilität
 
-Verwendete externe Projekte: [Three.js](https://threejs.org/) (`0.180.0`, MIT) und [occt-import-js](https://github.com/kovacsv/occt-import-js) (`0.0.24`, LGPL-2.1), auf Basis von [Open CASCADE Technology](https://dev.opencascade.org/). Bei einer Veröffentlichung sind die Lizenzen der jeweiligen Drittanbieter einzuhalten. Dieses Projekt lädt die Drittbibliotheken vom CDN; sie sind nicht Bestandteil dieses ZIPs.
+Verwendete externe Projekte: [Three.js](https://threejs.org/) (`0.180.0`, MIT) und [occt-import-js](https://github.com/kovacsv/occt-import-js) (`0.0.23`, LGPL-2.1), auf Basis von [Open CASCADE Technology](https://dev.opencascade.org/). Bei einer Veröffentlichung sind die Lizenzen der jeweiligen Drittanbieter einzuhalten. Dieses Projekt lädt die Drittbibliotheken vom CDN; sie sind nicht Bestandteil dieses ZIPs.
 
 ## Grenzen dieser ersten Version
 
@@ -89,3 +89,6 @@ Verwendete externe Projekte: [Three.js](https://threejs.org/) (`0.180.0`, MIT) u
 - **GLB Export kann Geometrie nicht erhalten:** Der Export ist immer trianguliert. Für die genaue CAD-Bearbeitung die Original-STEP-Datei aufbewahren.
 
 Stand: November 2026 · CADVIEW Studio Beta 1.0
+## Fehlerbehebung STEP-/IGES-Import (Beta 1.0.1)
+
+Die anfängliche Version referenzierte `occt-import-js@0.0.24` im npm-CDN, obwohl npm bisher `0.0.23` veröffentlicht hat. Ab Beta 1.0.1 ist der CAD-Importer auf `0.0.23` korrigiert, nutzt bei Bedarf `unpkg.com` als Ausweichadresse und lädt den Web Worker mit einer versionierten URL. Falls der Browser noch die alte Version zwischengespeichert hat, `Strg+F5` drücken.
