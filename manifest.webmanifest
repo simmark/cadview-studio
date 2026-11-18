@@ -23,5 +23,39 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "file_handlers": [
+    {
+      "action": "/cadview-studio/",
+      "name": "CADVIEW Studio – 3D-CAD-Datei öffnen",
+      "accept": {
+        "model/step": [
+          ".stp",
+          ".step"
+        ],
+        "model/iges": [
+          ".igs",
+          ".iges"
+        ],
+        "model/stl": [
+          ".stl"
+        ],
+        "model/obj": [
+          ".obj"
+        ],
+        "model/gltf-binary": [
+          ".glb"
+        ],
+        "model/gltf+json": [
+          ".gltf"
+        ],
+        "application/octet-stream": [
+          ".brep"
+        ]
+      }
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }
