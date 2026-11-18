@@ -468,7 +468,7 @@ function restoreMaterials(){
     mesh.material=newM.length===1?newM[0]:newM;
     applyFlagsToMesh(mesh);
   });
-  updateMaterialControls(); $('materialPreset').value='original';toast('Originalmaterialien wiederhergestellt.');
+  updateMaterialControls(); $('materialPreset').value='original';renderNow('original materials restored');toast('Originalmaterialien wiederhergestellt.');
 }
 function updateDimensions(){
   const b=selectionBounds();
@@ -491,7 +491,7 @@ function updateTree(){
     if(!nodeVisible(node))row.classList.add('dimmed');
     const indent=document.createElement('span');indent.className='tree-indent';indent.style.setProperty('--indent',Math.min(depth,15)*13+'px');row.append(indent);
     const arrow=document.createElement('button');arrow.className='tree-arrow'+(node.children.length?'':' empty');arrow.textContent=node.collapsed&&!term?'▸':'▾';arrow.title='Bauteile ein-/ausklappen';arrow.addEventListener('click',e=>{e.stopPropagation();node.collapsed=!node.collapsed;updateTree()});row.append(arrow);
-    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.textContent=nodeVisible(node)?'◉':'◌';eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions()});row.append(eye);
+    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.textContent=nodeVisible(node)?'◉':'◌';eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions();renderNow('single part visibility changed')});row.append(eye);
     const icon=document.createElement('span');icon.className='tree-symbol'+(node.isPart?' mesh':'');icon.textContent=node.isPart?'⬡':'▤';row.append(icon);
     const name=document.createElement('span');name.className='tree-name';name.textContent=node.obj.name||'Unbenannt';name.title=node.obj.name;row.append(name);
     row.addEventListener('click',e=>{
@@ -1665,7 +1665,7 @@ $('clearSelectionButton').addEventListener('click',()=>{selectNode(null);updateT
 document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>setView(el.dataset.view)));
 document.querySelectorAll('[data-orbit]').forEach(el=>el.addEventListener('click',()=>{const dir=el.dataset.orbit;orbitView(dir==='left'?-30:dir==='right'?30:0,dir==='up'?20:dir==='down'?-20:0)}));
 $('quickRotateModel')?.addEventListener('click',()=>{rotateActive('z',90);document.querySelector('[data-panel=transform]')?.click()});
-$('gridButton').addEventListener('click',()=>{const next=!grid.visible;grid.visible=next;axes.visible=next;$('gridButton').classList.toggle('active',next);$('gridButton').setAttribute('aria-pressed',String(next))});
+$('gridButton').addEventListener('click',()=>{const next=!grid.visible;grid.visible=next;axes.visible=next;$('gridButton').classList.toggle('active',next);$('gridButton').setAttribute('aria-pressed',String(next));renderNow('grid visibility changed')});
 $('wireframeButton').addEventListener('click',()=>{edgesEnabled=!edgesEnabled;showEdges(edgesEnabled);$('wireframeButton').classList.toggle('active',edgesEnabled);$('wireframeButton').setAttribute('aria-pressed',String(edgesEnabled))});
 $('measureButton').addEventListener('click',()=>{measuring=!measuring;clearMeasure();interactionSurface.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast(language()==='en'?'Measure: click two points. Magnetic snapping is enabled.':'Messen: Zwei Punkte anklicken. Magnetischer Fang ist aktiviert.')});
 $('sectionButton').addEventListener('click',()=>{clipEnabled=!clipEnabled;$('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection();$('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled))});
@@ -1673,7 +1673,7 @@ $('sectionRange').addEventListener('input',updateSection);
 for(const id of ['sectionAxis','sectionInvert','sectionNx','sectionNy','sectionNz','section2Axis','section2Range','section2Invert']) $(id).addEventListener('input',updateSection);
 $('section2Toggle').addEventListener('change',()=>{ $('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection() });
 $('explodeRange').addEventListener('input',updateExplode);
-$('xrayToggle').addEventListener('change',()=>modelRoot?.traverse(applyFlagsToMesh));
+$('xrayToggle').addEventListener('change',()=>{modelRoot?.traverse(applyFlagsToMesh);renderNow('xray changed')});
 $('lightBackgroundToggle').addEventListener('change',e=>setLightTheme(e.target.checked));
 $('materialPreset').addEventListener('change',e=>{
   const name=e.target.value;
