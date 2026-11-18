@@ -47,6 +47,10 @@ const pointer = new THREE.Vector2();
 const measurePoints = [];
 let measureMarkers = [];
 let measureLine = null;
+let measurementsVisible = true;
+let snapPreview = null;
+const cadence = {frame:0,hovering:false};
+const geometryEdgeCache = new WeakMap();
 let selected = null;
 const selectedNodes = new Set();
 let lastTreeSelection = null;
@@ -104,7 +108,22 @@ function material(options={}){
 }
 function toast(message,error=false){
   clearTimeout(toastTimer);
-  toastEl.textContent = message;
+  const alertText=String(message);
+  const mapped=language()==='en'?{
+    'Keine sichtbare Geometrie zum Einpassen.':'No visible geometry to fit.',
+    'Originalmaterialien wiederhergestellt.':'Original materials restored.',
+    'Bitte zuerst mindestens ein Bauteil auswählen.':'Please select at least one part.',
+    'Bitte direkt auf eine Modellfläche klicken.':'Click directly on a model surface.',
+    'Bitte eine Kategorie eingeben.':'Please enter a category.',
+    'Ungültiger Drehwinkel.':'Invalid rotation angle.',
+    'Keine sichtbaren Flächen zum Drehen.':'No visible surfaces to rotate.',
+    'Vorlage auswählen.':'Select a preset.',
+    'Beispielbaugruppe geladen.':'Demo assembly loaded.',
+    'Alle Bemaßungen entfernt.':'All dimensions cleared.',
+    'Projektkonfiguration geladen.':'Project configuration loaded.',
+    'Bildexport fehlgeschlagen.':'Image export failed.',
+    'Screenshot fehlgeschlagen.':'Screenshot failed.'}[alertText]:null;
+  toastEl.textContent = mapped||message;
   toastEl.className = 'toast' + (error?' error':'');
   toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 5500);
 }
@@ -530,28 +549,25 @@ function refreshSelectionBox(){
 }
 function baseBoundsForNode(obj){const b=new THREE.Box3();obj.updateWorldMatrix(true,true);obj.traverse(o=>{if(o.isMesh)b.expandByObject(o,true)});return b}
 function clearMeasure(){
-  measurePoints.length=0;
+  measurePoints.length=0; snapPreview=null; $('snapMarker')?.classList.add('hidden');
   for(const m of measureMarkers){scene.remove(m);m.geometry.dispose();m.material.dispose()}
   measureMarkers=[];
   if(measureLine){scene.remove(measureLine);measureLine.geometry.dispose();measureLine.material.dispose();measureLine=null}
   $('measureLabel').classList.add('hidden');
 }
 function addMeasurePoint(pos){
-  if(measurePoints.length===2)clearMeasure();
   measurePoints.push(pos.clone());
-  const marker=new THREE.Mesh(new THREE.SphereGeometry(.7,10,8),new THREE.MeshBasicMaterial({color:'#56ece1',depthTest:false}));
-  const bb=baseBounds();marker.scale.setScalar(Math.max(bb.getSize(new THREE.Vector3()).length()*.005,.6));
-  marker.position.copy(pos);marker.renderOrder=9;scene.add(marker);measureMarkers.push(marker);
+  const marker=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:'#22c6bd',depthTest:false,depthWrite:false}));
+  marker.userData.pixelRadius=3.5;marker.position.copy(pos);marker.renderOrder=92;scene.add(marker);measureMarkers.push(marker);
   if(measurePoints.length===2){
-    const dist=measurePoints[0].distanceTo(measurePoints[1]);
-    addSavedMeasurement(measurePoints[0],measurePoints[1]);
-    const geo=new THREE.BufferGeometry().setFromPoints(measurePoints);
-    measureLine=new THREE.Line(geo,new THREE.LineBasicMaterial({color:'#62e8dd',linewidth:2,depthTest:false}));measureLine.renderOrder=10;scene.add(measureLine);
-    $('measureLabel').textContent=`Gemessener Abstand: ${formatMeasured(dist)} · ΔX ${formatMeasured(Math.abs(measurePoints[1].x-measurePoints[0].x))} · ΔY ${formatMeasured(Math.abs(measurePoints[1].y-measurePoints[0].y))} · ΔZ ${formatMeasured(Math.abs(measurePoints[1].z-measurePoints[0].z))}`;
-    $('measureLabel').classList.remove('hidden');
-    toast(`Abstand gespeichert: ${formatMeasured(dist)}`);
+    const a=measurePoints[0].clone(),b=measurePoints[1].clone();
+    const dist=a.distanceTo(b);
+    addSavedMeasurement(a,b);
+    clearMeasure();
+    toast(`${translateDynamic('Distance saved')}: ${formatMeasured(dist)}`);
   }else{
-    $('measureLabel').textContent='Punkt 1 gesetzt – bitte Punkt 2 anklicken';$('measureLabel').classList.remove('hidden');
+    $('measureLabel').textContent=translateDynamic('Select second point');
+    $('measureLabel').classList.remove('hidden');
   }
 }
 function screenIntersections(evt){
@@ -678,14 +694,33 @@ async function exportModel(format){
   }catch(err){console.error(err);toast('Export fehlgeschlagen: '+(err.message||err),true)}
   finally{setLoading(false)}
 }
+function imageCanvas(){
+  const out=document.createElement('canvas');out.width=canvas.width;out.height=canvas.height;
+  const c=out.getContext('2d');c.drawImage(canvas,0,0);
+  if($('watermarkToggle')?.checked){
+    const scale=Math.max(1,Math.min(out.width/900,out.height/560));
+    const pad=17*scale,x=out.width-pad,y=out.height-pad;
+    c.save();c.font=`600 ${13*scale}px system-ui`;const text='CADVIEW by SIMONLATION';
+    const textWidth=c.measureText(text).width;
+    c.fillStyle='rgba(9,24,34,.82)';c.strokeStyle='rgba(60,209,207,.5)';c.lineWidth=1*scale;
+    c.beginPath();c.roundRect(x-textWidth-55*scale,y-35*scale,textWidth+55*scale,40*scale,7*scale);c.fill();c.stroke();
+    const cx=x-textWidth-32*scale,cy=y-15*scale;
+    c.strokeStyle='#45d5d2';c.lineWidth=2.5*scale;c.beginPath();
+    for(let i=0;i<6;i++){const a=i*Math.PI/3-Math.PI/6;const xx=cx+13*scale*Math.cos(a),yy=cy+13*scale*Math.sin(a);i?c.lineTo(xx,yy):c.moveTo(xx,yy)}c.closePath();c.stroke();
+    c.font=`bold ${9*scale}px system-ui`;c.fillStyle='#48dfd9';c.textAlign='center';c.textBaseline='middle';c.fillText('SIM',cx,cy+1*scale);
+    c.textAlign='left';c.fillStyle='#edfeff';c.font=`600 ${13*scale}px system-ui`;c.fillText(text,x-textWidth-10*scale,y-13*scale);
+    c.restore();
+  }
+  return out;
+}
 function screenshot(){
-  try{renderer.render(scene,camera);canvas.toBlob(b=>{if(b)download(b,filenameStem()+'-ansicht.png');else toast('Screenshot konnte nicht erzeugt werden.',true)},'image/png');}
+  try{renderer.render(scene,camera);imageCanvas().toBlob(b=>{if(b)download(b,filenameStem()+'-ansicht.png');else toast('Screenshot fehlgeschlagen.',true)},'image/png')}
   catch(err){toast('Screenshot fehlgeschlagen: '+err.message,true)}
 }
 function resize(){const r=viewport.getBoundingClientRect();if(r.width<=0||r.height<=0)return;
   renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
 new ResizeObserver(resize).observe(viewport);
-function animate(){requestAnimationFrame(animate);controls.update();refreshSelectionBox();renderer.render(scene,camera)}
+function animate(){requestAnimationFrame(animate);controls.update();refreshSelectionBox();updateOrientationWidget();updateMeasurementScale();renderer.render(scene,camera)}
 
 // CADVIEW Studio v1.2: editing, materials, grouping, measurements and PWA
 function applyCategory(){
@@ -871,34 +906,41 @@ function exportRotatedStep(){
 function formatMeasured(raw){
   let original=currentUnit==='mm'?'mm':currentUnit==='m'?'m':'Einheiten';
   const choice=$('measureUnits').value;
-  if(choice==='original'||original==='Einheiten')return raw.toLocaleString('de-DE',{maximumFractionDigits:3})+' '+original;
+  if(choice==='original'||original==='Einheiten')return raw.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3})+' '+original;
   const mm=original==='mm'?raw:raw*1000;
   const unit=choice;
   const value=unit==='mm'?mm:unit==='cm'?mm/10:unit==='m'?mm/1000:mm/25.4;
-  return value.toLocaleString('de-DE',{maximumFractionDigits:3})+' '+(unit==='inch'?'in':unit);
+  return value.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3})+' '+(unit==='inch'?'in':unit);
 }
 function createDimensionSprite(label){
-  const cv=document.createElement('canvas');cv.width=512;cv.height=128;
-  const c=cv.getContext('2d');c.fillStyle=lightTheme?'#ffffff':'#0d1c2d';c.strokeStyle='#49c6c2';c.lineWidth=4;
-  c.beginPath();c.roundRect(4,4,504,120,18);c.fill();c.stroke();
-  c.fillStyle=lightTheme?'#1b293a':'#e8ffff';c.font='bold 37px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText(label.slice(0,24),256,67);
+  const cv=document.createElement('canvas'); cv.width=512;cv.height=104;
+  const c=cv.getContext('2d');
+  c.fillStyle=lightTheme?'rgba(255,255,255,.94)':'rgba(15,36,50,.92)';
+  c.strokeStyle=lightTheme?'rgba(27,145,146,.6)':'rgba(72,214,208,.75)';c.lineWidth=3;
+  c.beginPath();c.roundRect(3,3,506,98,13);c.fill();c.stroke();
+  c.fillStyle=lightTheme?'#163c4e':'#e0fefa';c.font='600 33px system-ui';
+  c.textAlign='center';c.textBaseline='middle';c.fillText(label.slice(0,30),256,53);
   const texture=new THREE.CanvasTexture(cv);texture.colorSpace=THREE.SRGBColorSpace;
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));
-  const size=Math.max(baseBounds().getSize(new THREE.Vector3()).length()*.095,2);
-  sprite.scale.set(size*3,size*.75,1);sprite.renderOrder=99;return sprite;
+  sprite.userData.pixelWidth=Math.min(144,Math.max(90,label.length*6.4+22));
+  sprite.userData.pixelHeight=23;
+  sprite.renderOrder=103;return sprite;
 }
 function makeMeasureGraphic(a,b,label){
   const g=new THREE.Group();g.name='Bemaßung · '+label;
-  const col=0x32d2cb;
-  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:col,depthTest:false}));line.renderOrder=80;g.add(line);
-  const radius=Math.max(baseBounds().getSize(new THREE.Vector3()).length()*.0028,.18);
-  for(const p of [a,b]){
-    const dot=new THREE.Mesh(new THREE.SphereGeometry(radius,10,8),new THREE.MeshBasicMaterial({color:col,depthTest:false}));dot.position.copy(p);dot.renderOrder=81;g.add(dot);
+  const col=0x25c6be;
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:col,depthTest:false,depthWrite:false,transparent:true,opacity:.85}));
+  line.renderOrder=86;g.add(line);
+  for(const pt of [a,b]){
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:col,depthTest:false,depthWrite:false}));
+    dot.position.copy(pt);dot.userData.pixelRadius=3;dot.renderOrder=102;g.add(dot);
   }
-  const labelSprite=createDimensionSprite(label);labelSprite.position.copy(a).add(b).multiplyScalar(.5);g.add(labelSprite);
-  scene.add(g);return g;
+  const sprite=createDimensionSprite(label);
+  sprite.position.copy(a).add(b).multiplyScalar(.5);
+  g.add(sprite);g.visible=measurementsVisible;scene.add(g);return g;
 }
 function disposeDimensionGroup(g){
+  if(!g)return;
   scene.remove(g);g.traverse(o=>{o.geometry?.dispose();const arr=Array.isArray(o.material)?o.material:[o.material];for(const m of arr)if(m){m.map?.dispose();m.dispose?.()}});
 }
 function addSavedMeasurement(a,b,label='Abstand',refresh=true){
@@ -908,46 +950,123 @@ function addSavedMeasurement(a,b,label='Abstand',refresh=true){
   if(refresh)refreshMeasurementDisplays();
 }
 function clearSavedMeasurements(){savedMeasurements.splice(0).forEach(m=>disposeDimensionGroup(m.graphic));refreshMeasurementDisplays()}
-function clearAutoDimensions(){dimensionGraphics.forEach(disposeDimensionGroup);dimensionGraphics=[]}
+function clearAutoDimensions(){dimensionGraphics.forEach(disposeDimensionGroup);dimensionGraphics=[];setDimensionControls()}
 function refreshMeasurementDisplays(){
   for(const m of savedMeasurements){disposeDimensionGroup(m.graphic);m.graphic=makeMeasureGraphic(m.a,m.b,formatMeasured(m.a.distanceTo(m.b)))}
   const list=$('measurementList');list.replaceChildren();
-  if(!savedMeasurements.length){const p=document.createElement('p');p.className='dimension-note';p.textContent='Noch keine Punktmessungen. Im 3D-Modell zwei Punkte anklicken.';list.append(p)}
+  if(!savedMeasurements.length){const el=document.createElement('p');el.className='dimension-note';el.textContent=translateDynamic('No point measurements yet');list.append(el)}
   savedMeasurements.forEach((m,i)=>{
     const row=document.createElement('div');row.className='measurement-entry';
-    const label=document.createElement('span');label.textContent=`${i+1}. ${m.label}: ${formatMeasured(m.a.distanceTo(m.b))}`;
-    const button=document.createElement('button');button.textContent='×';button.title='Messung löschen';button.addEventListener('click',()=>{disposeDimensionGroup(m.graphic);savedMeasurements.splice(i,1);refreshMeasurementDisplays()});
+    const label=document.createElement('span');label.textContent=`${i+1}. ${measureLabel(m.label)}: ${formatMeasured(m.a.distanceTo(m.b))}`;
+    const button=document.createElement('button');button.textContent='×';button.title=translateDynamic('Delete measurement');button.addEventListener('click',()=>{disposeDimensionGroup(m.graphic);savedMeasurements.splice(i,1);refreshMeasurementDisplays()});
     row.append(label,button);list.append(row);
   });
+  setDimensionControls();
 }
 function addAutoDimensions(){
-  clearAutoDimensions();const b=selectionBounds();if(b.isEmpty())return toast('Keine sichtbare Geometrie zum Bemaßen.',true);
-  const s=b.getSize(new THREE.Vector3());const offset=Math.max(s.length()*.04,.3);
-  const data=[
+  if(dimensionGraphics.length){clearAutoDimensions();toast(translateDynamic('Automatic dimensions hidden'));return}
+  const b=selectionBounds();if(b.isEmpty())return toast(translateDynamic('No visible geometry'),true);
+  const size=b.getSize(new THREE.Vector3()), offset=Math.max(size.length()*.055,.3);
+  const values=[
     [new THREE.Vector3(b.min.x,b.min.y-offset,b.min.z-offset),new THREE.Vector3(b.max.x,b.min.y-offset,b.min.z-offset),'X'],
     [new THREE.Vector3(b.max.x+offset,b.min.y,b.min.z-offset),new THREE.Vector3(b.max.x+offset,b.max.y,b.min.z-offset),'Y'],
     [new THREE.Vector3(b.max.x+offset,b.max.y+offset,b.min.z),new THREE.Vector3(b.max.x+offset,b.max.y+offset,b.max.z),'Z']
   ];
-  for(const [a,c,axis] of data)dimensionGraphics.push(makeMeasureGraphic(a,c,axis+' = '+formatMeasured(a.distanceTo(c))));
-  toast('Breite (X), Tiefe (Y) und Höhe (Z) als Bemaßung eingeblendet.');
+  for(const [a,c,axis] of values)dimensionGraphics.push(makeMeasureGraphic(a,c,axis+' = '+formatMeasured(a.distanceTo(c))));
+  setDimensionControls();toast(translateDynamic('Automatic dimensions displayed'));
 }
-function snapMeasurePoint(hit,event){
-  const mode=$('measureSnap').value;
-  if(mode==='surface'||!hit.face)return hit.point.clone();
-  const position=hit.object.geometry.getAttribute('position');
-  const vertices=[hit.face.a,hit.face.b,hit.face.c].map(i=>hit.object.localToWorld(new THREE.Vector3().fromBufferAttribute(position,i)));
-  const xy=p=>{const v=p.clone().project(camera),rect=canvas.getBoundingClientRect();return {x:rect.left+(v.x+1)/2*rect.width,y:rect.top+(1-v.y)/2*rect.height}};
-  const mouse={x:event.clientX,y:event.clientY};
-  let best=hit.point.clone(),bestDist=15;
-  if(mode==='vertex')for(const v of vertices){const s=xy(v),d=Math.hypot(s.x-mouse.x,s.y-mouse.y);if(d<bestDist){best=v;bestDist=d}}
-  if(mode==='edge')for(const [a,b] of [[vertices[0],vertices[1]],[vertices[1],vertices[2]],[vertices[2],vertices[0]]]){
-    const pa=xy(a),pb=xy(b),dx=pb.x-pa.x,dy=pb.y;
-    const t=Math.max(0,Math.min(1,((mouse.x-pa.x)*dx+(mouse.y-pa.y)*dy)/Math.max(dx*dx+dy*dy,1e-12)));
-    const sx=pa.x+t*dx,sy=pa.y+t*dy,d=Math.hypot(sx-mouse.x,sy-mouse.y);
-    if(d<bestDist){best=a.clone().lerp(b,t);bestDist=d}
+function undoMeasurement(){
+  if(measurePoints.length){clearMeasure();toast(translateDynamic('Pending point removed'));return}
+  if(savedMeasurements.length){const m=savedMeasurements.pop();disposeDimensionGroup(m.graphic);refreshMeasurementDisplays();toast(translateDynamic('Last measurement undone'));return}
+  if(dimensionGraphics.length){clearAutoDimensions();toast(translateDynamic('Automatic dimensions hidden'));return}
+  toast(translateDynamic('No measurement to undo'));
+}
+function toggleMeasurements(){
+  measurementsVisible=!measurementsVisible;
+  [...dimensionGraphics,...savedMeasurements.map(m=>m.graphic)].forEach(g=>{if(g)g.visible=measurementsVisible});
+  setDimensionControls();
+}
+function setDimensionControls(){
+  for(const id of ['toggleMeasuresButton','toggleMeasurementVisibility']){
+    const button=$(id);if(!button)continue;
+    button.classList.toggle('active',measurementsVisible);
+    button.setAttribute('aria-pressed',String(measurementsVisible));
   }
-  return best;
+  if($('toggleMeasurementVisibility'))$('toggleMeasurementVisibility').textContent=measurementsVisible?translateDynamic('Hide dimensions'):translateDynamic('Show dimensions');
 }
+function worldPerPixel(p){
+  const height=Math.max(1,viewport.clientHeight);
+  if(camera.isPerspectiveCamera)return Math.max(.00000001,2*camera.position.distanceTo(p)*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/height);
+  return (camera.top-camera.bottom)/height;
+}
+function updateMeasurementScale(){
+  const resizeGroup=g=>{if(!g||!g.visible)return;g.traverse(o=>{
+    if(o.userData.pixelRadius){const size=worldPerPixel(o.getWorldPosition(new THREE.Vector3()))*o.userData.pixelRadius;o.scale.setScalar(size)}
+    if(o.isSprite&&o.userData.pixelWidth){const pp=worldPerPixel(o.getWorldPosition(new THREE.Vector3()));o.scale.set(o.userData.pixelWidth*pp,o.userData.pixelHeight*pp,1)}
+  })};
+  for(const g of dimensionGraphics)resizeGroup(g);
+  for(const m of savedMeasurements)resizeGroup(m.graphic);
+  for(const marker of measureMarkers){marker.scale.setScalar(worldPerPixel(marker.position)*3.5)}
+}
+const snap2d=p=>{const v=p.clone().project(camera),r=canvas.getBoundingClientRect();return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,z:v.z}};
+function candidatePoint(hit,event){
+  const mode=$('measureSnap').value;
+  const result={point:hit.point.clone(),kind:'surface',px:0};
+  if(mode==='surface'||!hit.face)return result;
+  const pos=hit.object.geometry.getAttribute('position');if(!pos)return result;
+  const world=hit.object.matrixWorld;const mouse={x:event.clientX,y:event.clientY};
+  const faceVertices=[hit.face.a,hit.face.b,hit.face.c].map(i=>new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(world));
+  const geom=hit.object.geometry;
+  if(!geometryEdgeCache.has(geom)){
+    try{
+      const edgeGeometry=new THREE.EdgesGeometry(geom,25);
+      // The visible tessellation can contain thousands of short edges. Limit snap scanning to protect the UI.
+      const p=edgeGeometry.getAttribute('position');
+      const pairs=[];const stride=Math.max(1,Math.ceil(p.count/2/5000));
+      for(let i=0;i+1<p.count;i+=2*stride)pairs.push([new THREE.Vector3().fromBufferAttribute(p,i),new THREE.Vector3().fromBufferAttribute(p,i+1)]);
+      geometryEdgeCache.set(geom,pairs);edgeGeometry.dispose();
+    }catch{geometryEdgeCache.set(geom,[])}
+  }
+  const pairs=geometryEdgeCache.get(geom);
+  let best={...result,px:15};
+  const want=kind=>mode==='auto'||mode===kind;
+  const offer=(pt,kind,bias=0)=>{
+    const s=snap2d(pt);if(s.z>1||s.z< -1)return;
+    const d=Math.hypot(s.x-mouse.x,s.y-mouse.y)+bias;
+    if(d<best.px)best={point:pt.clone(),kind,px:d};
+  };
+  if(want('vertex'))for(const v of faceVertices)offer(v,'vertex',-2);
+  const nearFaceEdges=[[faceVertices[0],faceVertices[1]],[faceVertices[1],faceVertices[2]],[faceVertices[2],faceVertices[0]]];
+  // Snap to visual (crease/boundary) mesh edges, not arbitrary internal triangle diagonals.
+  const targetEdges=pairs.length?pairs.map(([a,b])=>[a.clone().applyMatrix4(world),b.clone().applyMatrix4(world)]):nearFaceEdges;
+  for(const [a,b] of targetEdges){
+    const pa=snap2d(a),pb=snap2d(b);
+    if(Math.min(pa.x,pb.x)>mouse.x+22||Math.max(pa.x,pb.x)<mouse.x-22||Math.min(pa.y,pb.y)>mouse.y+22||Math.max(pa.y,pb.y)<mouse.y-22)continue;
+    if(want('vertex')){offer(a,'vertex',-2);offer(b,'vertex',-2)}
+    if(want('midpoint'))offer(a.clone().lerp(b,.5),'midpoint',-1);
+    if(want('quarter')){offer(a.clone().lerp(b,.25),'quarter',-.75);offer(a.clone().lerp(b,.75),'quarter',-.75)}
+    if(want('edge')){
+      const dx=pb.x-pa.x,dy=pb.y-pa.y,t=THREE.MathUtils.clamp(((mouse.x-pa.x)*dx+(mouse.y-pa.y)*dy)/Math.max(dx*dx+dy*dy,1e-8),0,1);
+      offer(a.clone().lerp(b,t),'edge',1.5);
+    }
+  }
+  if(want('faceCenter')){
+    // Approximation: centroid of the hit triangle, not the center of an analytic CAD face.
+    offer(faceVertices[0].clone().add(faceVertices[1]).add(faceVertices[2]).divideScalar(3),'faceCenter',2);
+  }
+  // The selected face point is always a valid fallback; snapping is magnetic within 15px.
+  return best.px<15?best:result;
+}
+function showSnapPreview(event){
+  const marker=$('snapMarker');if(!measuring||event.altKey){marker.classList.add('hidden');snapPreview=null;return}
+  const hits=screenIntersections(event);if(!hits.length){marker.classList.add('hidden');snapPreview=null;return}
+  snapPreview=candidatePoint(hits[0],event);
+  const p=snap2d(snapPreview.point),bounds=canvas.getBoundingClientRect();
+  marker.style.left=(p.x-bounds.left)+'px';marker.style.top=(p.y-bounds.top)+'px';
+  marker.dataset.kind=snapPreview.kind;marker.classList.remove('hidden');
+}
+function snapMeasurePoint(hit,event){return event.altKey?hit.point.clone():candidatePoint(hit,event).point.clone()}
+
 function setLightTheme(light){
   lightTheme=Boolean(light);lightBackground=lightTheme;
   document.documentElement.dataset.theme=lightTheme?'light':'dark';
@@ -974,15 +1093,14 @@ async function setStudio(enabled){
 }
 function screenshotHighRes(){
   const rect=viewport.getBoundingClientRect();const old=renderer.getPixelRatio();
-  const ratio=Math.min(Math.max(old*2,2),Math.min(4096/rect.width,4096/rect.height));
+  const ratio=Math.min(Math.max(old*2,2),4096/Math.max(rect.width,rect.height));
   if(!Number.isFinite(ratio)||ratio<=0)return;
   try{
     renderer.setPixelRatio(ratio);renderer.setSize(rect.width,rect.height,false);renderer.render(scene,camera);
-    canvas.toBlob(blob=>{
-      renderer.setPixelRatio(old);resize();
-      if(blob)download(blob,filenameStem()+'-render.png');else toast('Bildexport fehlgeschlagen.',true);
-    },'image/png');
-    toast(`Renderbild ${Math.round(rect.width*ratio)} × ${Math.round(rect.height*ratio)} Pixel.`);
+    const output=imageCanvas();
+    renderer.setPixelRatio(old);resize();
+    output.toBlob(blob=>{if(blob)download(blob,filenameStem()+'-render.png');else toast('Bildexport fehlgeschlagen.',true)},'image/png');
+    toast(`PNG: ${output.width} × ${output.height} px`);
   }catch(err){renderer.setPixelRatio(old);resize();toast('Bildexport: '+err.message,true)}
 }
 function initializePWA(){
@@ -998,6 +1116,233 @@ async function promptInstallation(){
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
   toast(isIOS?'Auf iOS: Teilen → Zum Home-Bildschirm.':'In Edge/Chrome: Menü → Apps → Diese Website als App installieren.');
 }
+
+let axisReference='world';
+const AXIS_DATA=[{key:'X',v:new THREE.Vector3(1,0,0),color:'#e2626f'},{key:'Y',v:new THREE.Vector3(0,1,0),color:'#4ab576'},{key:'Z',v:new THREE.Vector3(0,0,1),color:'#4e97ee'}];
+function toggleAxisReference(){axisReference=axisReference==='world'?'part':'world';$('axisModeButton').textContent=axisReference==='world'?translateDynamic('World axes'):translateDynamic('Part axes');$('axisHint').textContent=axisReference==='world'?(language()==='en'?'WORLD AXES · XYZ':'WELTACHSEN · XYZ'):(language()==='en'?'PART AXES · XYZ':'TEILACHSEN · XYZ')}
+function updateOrientationWidget(){
+  cadence.frame++;
+  if(cadence.frame%2)return;
+  const cv=$('orientationCanvas');if(!cv)return;
+  const ctx=cv.getContext('2d');const w=cv.width,h=cv.height;
+  ctx.clearRect(0,0,w,h);
+  const q=camera.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const center={x:w/2,y:h/2},length=68;
+  ctx.beginPath();ctx.arc(center.x,center.y,4,0,Math.PI*2);ctx.fillStyle=lightTheme?'#395568':'#d7ecf6';ctx.fill();
+  const objQ=new THREE.Quaternion();
+  if(axisReference==='part'&&selected?.obj)selected.obj.getWorldQuaternion(objQ);
+  const axes=AXIS_DATA.map(v=>({ ...v, tip:v.v.clone().applyQuaternion(objQ).applyQuaternion(q)})).sort((a,b)=>a.tip.z-b.tip.z);
+  for(const axis of axes){
+    const depth=axis.tip.z<0;const x=center.x+axis.tip.x*length,y=center.y-axis.tip.y*length;
+    ctx.globalAlpha=depth?.35:1;ctx.strokeStyle=axis.color;ctx.lineWidth=depth?2.5:4;
+    ctx.beginPath();ctx.moveTo(center.x,center.y);ctx.lineTo(x,y);ctx.stroke();
+    if(depth)ctx.setLineDash([4,5]);ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(x,y,14,0,Math.PI*2);ctx.fillStyle=axis.color;ctx.fill();
+    ctx.font='bold 18px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.fillText(axis.key,x,y+1);
+    ctx.globalAlpha=1;
+  }
+}
+
+
+const HOTKEYS=[
+ ['Space','Show everything and fit view','Alles anzeigen und einpassen'],
+ ['F','Fit selected part or model','Auswahl oder Modell einpassen'],
+ ['H / Delete','Hide selected objects','Auswahl ausblenden'],
+ ['Shift + H','Show all objects','Alle Objekte anzeigen'],
+ ['I','Isolate selected objects','Auswahl isolieren'],
+ ['M','Toggle distance measuring','Distanzmessung starten/beenden'],
+ ['D','Show/hide X/Y/Z dimensions','X/Y/Z-Bemaßung ein-/ausblenden'],
+ ['U / Ctrl + Z','Undo last measurement','Letzte Messung rückgängig'],
+ ['G','Show/hide reference grid','Raster ein-/ausblenden'],
+ ['A','Toggle world/part axes','Welt- / Teilachsen umschalten'],
+ ['1','Isometric view (3D)','Isometrische Ansicht (3D)'],
+ ['2','Top (+Z)','Oben (+Z)'],
+ ['3','Front (−Y)','Vorne (−Y)'],
+ ['4','Right (+X)','Rechts (+X)'],
+ ['5','Left (−X)','Links (−X)'],
+ ['6','Back (+Y)','Hinten (+Y)'],
+ ['7','Bottom (−Z)','Unten (−Z)'],
+ ['Ctrl + O','Open a 3D file','3D-Datei öffnen'],
+ ['? / F1','Show this guide','Diese Hilfe anzeigen'],
+ ['Esc','Cancel measurement / selection','Messung / Auswahl abbrechen'],
+ ['Ctrl + click','Select multiple parts','Mehrere Bauteile markieren'],
+ ['Alt (while measuring)','Temporarily turn off snapping','Fangpunkte kurz deaktivieren'],
+];
+const TRANSLATIONS={
+ 'Modell öffnen':'Open model','Demo':'Demo','Hell':'Light','Dunkel':'Dark','Installieren':'Install',
+ 'Screenshot':'Screenshot','Exportieren':'Export','Hilfe':'Help','Modellstruktur':'Model structure',
+ 'PROJEKT':'PROJECT','BAUTEILE':'PARTS','SCHNELLZUGRIFF':'QUICK ACTIONS',
+ 'Alle Teile sichtbar machen':'Show all parts','Alle Teile ausblenden':'Hide all parts',
+ 'Bauteile suchen …':'Search parts…','Mehrfachauswahl: Strg-Klick, Umschalt-Klick oder Strg im 3D-Modell.':'Multi-selection: Ctrl-click, Shift-click or Ctrl in the 3D view.',
+ 'Alles einpassen':'Fit all','Isolieren':'Isolate','Sichtbarkeit':'Visibility','Auswahl aufheben':'Clear selection',
+ 'Lokal im Browser':'Processed locally','Deine CAD-Datei wird nicht auf einen Server hochgeladen.':'Your CAD file is not uploaded to a server.',
+ 'Oben':'Top','Vorne':'Front','Rechts':'Right','Links':'Left','Hinten':'Back','Unten':'Bottom',
+ 'Kanten':'Edges','Messen':'Measure','Schnitt':'Section','Bemaßung':'Dimensions','Studio':'Studio','Raster':'Grid',
+ 'Rückgängig':'Undo','Maße':'Dimensions','Maße ausblenden':'Hide dimensions','Maße einblenden':'Show dimensions',
+ 'WELTACHSEN · XYZ':'WORLD AXES · XYZ',
+ 'Drehen: links · Zoomen: Rad · Verschieben: rechts ·':'Orbit: left · Zoom: wheel · Pan: right ·',
+ 'Tastenkürzel':'Shortcuts','Bereit – Demo geladen':'Ready – demo loaded','Einheit: mm':'Unit: mm',
+ 'EIGENSCHAFTEN':'PROPERTIES','Inspektor':'Inspector','Kein Bauteil ausgewählt':'No part selected',
+ 'Modell oder Bauteil anklicken':'Select model or part','MATERIAL & FARBE':'MATERIAL & COLOR',
+ 'Zurücksetzen':'Reset','Material-Vorlage':'Material preset','Original aus CAD':'Original from CAD',
+ 'Aluminium · satiniert':'Aluminum · satin','Edelstahl · gebürstet':'Stainless steel · brushed',
+ 'Chrom · glänzend':'Chrome · glossy','Kupfer':'Copper','Messing':'Brass',
+ 'Kunststoff · matt':'Plastic · matte','Gummi · schwarz':'Rubber · black','Glas · transparent':'Glass · transparent',
+ 'Benutzerdefiniert':'Custom','Grundfarbe':'Base color','Farbe des ausgewählten Bauteils':'Selected part color',
+ 'Metallisch':'Metallic','Rauheit':'Roughness','Deckkraft':'Opacity','TEILE & KATEGORIEN':'PARTS & CATEGORIES',
+ 'Kategorie der Auswahl':'Selection category','z. B. Pins, Wicklung, Kern':'e.g. Pins, Winding, Core',
+ 'Kategorie für Auswahl übernehmen':'Apply category','Material und Kategorie können für mehrere Teile gleichzeitig gesetzt werden. Beim GLB-Export als separate Gruppen nutzbar.':'Material and category can be applied to multiple parts and exported as separate GLB groups.',
+ 'AUSRICHTUNG & ROTATION':'ORIENTATION & ROTATION','Achse':'Axis','Winkel (°)':'Angle (°)',
+ 'X-Achse':'X axis','Y-Achse':'Y axis','Z-Achse':'Z axis','↶ -Winkel':'↶ -Angle','↷ +Winkel':'↷ +Angle',
+ 'Dreht ausgewählte Bauteile gemeinsam um ihre Mitte – ohne Auswahl das gesamte Modell. Die Drehung verändert den Export.':'Rotates selected parts around their center; without selection, the entire model. Rotation affects mesh exports.',
+ 'Eigene Drehvorlage':'Rotation preset name','Gespeichert':'Saved',
+ 'z. B. Pins nach oben':'e.g. Pins up','Vorlage auswählen …':'Select preset…','Vorlage sichern':'Save preset',
+ 'Anwenden':'Apply','Projekt speichern':'Save project','Projekt öffnen':'Open project',
+ 'DARSTELLUNG':'APPEARANCE','Explosionsansicht':'Exploded view','Bauteile auseinanderziehen':'Separate parts',
+ 'Schnittebene 1':'Section plane 1','Achse und Position auswählen':'Choose axis and position',
+ 'Umkehren':'Invert','Freier Normalvektor':'Custom normal','Zweite Schnittebene':'Second section plane',
+ 'Zusätzlicher Schnitt':'Additional section','Transparenzmodus':'X-ray mode','Alle Bauteile durchscheinend':'Transparent parts',
+ 'Hintergrund':'Background','Heller oder dunkler Viewport':'Light or dark viewport',
+ 'Studio-Materialrendering':'Studio material rendering','Reflexionen und realistischere Metalle':'Reflections and realistic metals',
+ 'Renderbild als PNG (2×) speichern':'Save render PNG (2×)',
+ 'Wasserzeichen: CADVIEW by Simonlation':'Watermark: CADVIEW by Simonlation',
+ 'ABMESSUNGEN':'DIMENSIONS','Breite · X':'Width · X','Tiefe · Y':'Depth · Y','Höhe · Z':'Height · Z',
+ 'Abmessungen der Auswahl (oder des gesamten Modells). Angezeigte Maße entsprechen den importierten Koordinaten.':'Dimensions of selection (or full model) in imported coordinates.',
+ 'Breite · Tiefe · Höhe einzeichnen':'Draw width · depth · height',
+ 'Messpunkt-Fang':'Point snapping','Maßeinheit':'Units','Automatisch · magnetisch':'Automatic magnetic',
+ 'Ecke □':'Vertex □','Kante ━':'Edge ━','Kantenmitte ◐':'Midpoint ◐','Viertelpunkt ◔':'Quarter point ◔',
+ 'Flächenmitte ◉ (Mesh)':'Face center ◉ (mesh)','Freier Flächenpunkt':'Free surface point',
+ 'Original':'Original','MESSUNGEN':'MEASUREMENTS','Alle löschen':'Clear all',
+ '□ Ecke · ◐ Kantenmitte · ◔ Viertelpunkt · ◉ Flächenmitte.':'□ Vertex · ◐ Midpoint · ◔ Quarter · ◉ Face center.',
+ 'Fang vorübergehend aus. Dreiecksnetze: angenäherte Punkte.':'temporarily disables snap. Triangle-mesh points are approximate.',
+ 'Ecken- und Kantenfang basieren auf Dreiecksnetzen. Das ist keine analytische CAD-Kantenmessung. Schnitte sind visuell und verändern die Datei nicht.':'Snap points are derived from triangle meshes, not analytic CAD edges. Sections are visual and do not modify the source file.',
+ 'Schließen':'Close','Steuerung & Tastenkürzel':'Controls & shortcuts','Verstanden':'Got it',
+ 'Diese Hilfe beim Start nicht erneut anzeigen':'Do not show this guide at startup',
+ 'Drehen: linke Maustaste · Verschieben: rechte Maustaste · Zoomen: Mausrad. Mit Strg-Klick mehrere Teile auswählen.':'Orbit: left drag · Pan: right drag · Zoom: mouse wheel. Ctrl-click to select multiple parts.',
+ 'Messfang arbeitet auf gerenderten Dreiecksnetzen. Mesh-Ecken sind nicht zwingend geometrische CAD-Ecken. Die X/Y/Z-Anzeige zeigt die festen Weltachsen relativ zur aktuellen Kamerarichtung.':'Snapping uses rendered triangle meshes, not guaranteed analytic CAD vertices. The XYZ widget shows fixed world axes relative to the camera.',
+ '3D-Modell ablegen':'Drop 3D model','Dein Modell beginnt hier.':'Your model starts here.',
+ 'Datei auswählen':'Choose file','CAD-Datei wird eingelesen …':'Loading CAD file…',
+ 'Bei komplexen STEP-Baugruppen kann das einen Moment dauern.':'Large STEP assemblies may take some time.',
+ 'Originale Baugruppe':'Original assembly','Nach Kategorien':'By category','Nach Materialien':'By material',
+ 'Kategorie → Material':'Category → Material','Geometrie für 3D-Druck':'Geometry for 3D printing',
+ 'Original-STEP unverändert':'Unchanged original STEP','Projekt JSON':'Project JSON',
+ 'Rotationen, Kategorien, Materialien, Maße':'Rotations, categories, materials, measurements',
+ 'Noch keine Punktmessungen. Im 3D-Modell zwei Punkte anklicken.':'No point measurements. Click two points on the model.',
+ 'Messung löschen':'Delete measurement',
+};
+const DYNAMIC_TRANSLATIONS={
+  'Distance saved':'Distance saved','Select second point':'First point set – select second point',
+  'No point measurements yet':'No point measurements yet. Click two points on the 3D model.',
+  'Delete measurement':'Delete measurement','Automatic dimensions hidden':'Automatic dimensions hidden',
+  'Automatic dimensions displayed':'Automatic X/Y/Z dimensions displayed',
+  'No visible geometry':'No visible geometry','Pending point removed':'Pending point removed',
+  'Last measurement undone':'Last measurement undone','No measurement to undo':'No measurement to undo',
+  'Hide dimensions':'◉ Hide dimensions','Show dimensions':'◌ Show dimensions',
+  'World axes':'World','Part axes':'Part',
+};
+const DYNAMIC_GERMAN={
+  'Distance saved':'Abstand gespeichert','Select second point':'Erster Punkt gesetzt – zweiten Punkt auswählen',
+  'No point measurements yet':'Noch keine Punktmessungen. Zwei Punkte im 3D-Modell anklicken.',
+  'Delete measurement':'Messung löschen','Automatic dimensions hidden':'Automatische Bemaßung ausgeblendet',
+  'Automatic dimensions displayed':'Automatische X/Y/Z-Bemaßung eingeblendet',
+  'No visible geometry':'Keine sichtbare Geometrie','Pending point removed':'Vorläufiger Messpunkt entfernt',
+  'Last measurement undone':'Letzte Messung rückgängig gemacht','No measurement to undo':'Keine Messung zum Rückgängigmachen',
+  'Hide dimensions':'◉ Maße ausblenden','Show dimensions':'◌ Maße einblenden',
+  'World axes':'Welt','Part axes':'Teil',
+};
+function language(){return $('languageSelect')?.value||'de'}
+function translateDynamic(key){return language()==='en'?(DYNAMIC_TRANSLATIONS[key]||key):(DYNAMIC_GERMAN[key]||key)}
+function measureLabel(label){return language()==='en'&&label==='Abstand'?'Distance':label}
+function translateVisibleUI(){
+  const lang=language();document.documentElement.lang=lang;
+  if($('axisModeButton'))$('axisModeButton').textContent=axisReference==='world'?translateDynamic('World axes'):translateDynamic('Part axes');
+  if($('axisHint'))$('axisHint').textContent=axisReference==='world'?(lang==='en'?'WORLD AXES · XYZ':'WELTACHSEN · XYZ'):(lang==='en'?'PART AXES · XYZ':'TEILACHSEN · XYZ');
+  const root=document.querySelector('.app');if(!root)return;
+  const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  while(walk.nextNode()){
+    const n=walk.currentNode;
+    if(!n._cadOriginal)n._cadOriginal=n.textContent;
+    let de=n._cadOriginal,trimmed=de.trim();
+    const changedTo=n.textContent.trim();
+    if(TRANSLATIONS[trimmed] && changedTo!==trimmed && changedTo!==TRANSLATIONS[trimmed]){n._cadOriginal=n.textContent;de=n._cadOriginal;trimmed=de.trim()}
+    if(!trimmed)continue;
+    const english=TRANSLATIONS[trimmed];
+    if(english){const target=lang==='en'?english:trimmed;
+      const desired=de.replace(trimmed,target);
+      if(n.textContent!==desired)n.textContent=desired;
+    }
+  }
+  for(const el of root.querySelectorAll('[placeholder],[title],[aria-label]')){
+    for(const attr of ['placeholder','title','aria-label']){
+      if(!el.hasAttribute(attr))continue;
+      const key='cadOriginal'+attr;
+      if(!el.dataset[key])el.dataset[key]=el.getAttribute(attr);
+      const german=el.dataset[key];
+      const desired=lang==='en'?(TRANSLATIONS[german]||german):german;
+      if(el.getAttribute(attr)!==desired)el.setAttribute(attr,desired);
+    }
+  }
+  const help=$('helpDialog');if(help){
+    for(const el of help.querySelectorAll('[data-local-de]'))el.textContent=lang==='en'?el.dataset.localEn:el.dataset.localDe;
+  }
+  renderHotkeys();
+}
+let localizationPending=false;
+function scheduleLocalization(){if(localizationPending)return;localizationPending=true;requestAnimationFrame(()=>{localizationPending=false;translateVisibleUI()})}
+function renderHotkeys(){
+  const list=$('shortcutGrid');if(!list)return;
+  const lang=language();const state=lang+':'+HOTKEYS.length;
+  if(list.dataset.languageState===state)return;
+  list.dataset.languageState=state;list.replaceChildren();
+  HOTKEYS.forEach(([key,en,de])=>{const row=document.createElement('div');row.className='shortcut-item';
+    const span=document.createElement('span');span.textContent=lang==='en'?en:de;
+    const kbd=document.createElement('kbd');kbd.textContent=key;
+    row.append(span,kbd);list.append(row);
+  });
+}
+function openHelp(){const modal=$('helpDialog');if(!modal.open)modal.showModal();translateVisibleUI()}
+function closeHelp(){const modal=$('helpDialog');if(modal.open)modal.close();if($('skipOnboarding').checked)localStorage.setItem('cadview-guide-v1','dismissed')}
+function setupHelpAndLocalization(){
+  $('languageSelect').value=localStorage.getItem('cadview-lang')==='en'?'en':'de';
+  $('languageSelect').addEventListener('change',()=>{localStorage.setItem('cadview-lang',language());translateVisibleUI();refreshMeasurementDisplays();setDimensionControls()});
+  $('helpButton').addEventListener('click',openHelp);
+  $('axisModeButton').addEventListener('click',toggleAxisReference);
+  $('helpClose').addEventListener('click',closeHelp);
+  $('helpConfirm').addEventListener('click',()=>{if($('skipOnboarding').checked)localStorage.setItem('cadview-guide-v1','dismissed');closeHelp()});
+  document.addEventListener('keydown',event=>{
+    const input=['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)||document.activeElement?.isContentEditable;
+    if((event.key==='F1'||event.key==='?')&&!input){event.preventDefault();openHelp();return}
+    if($('helpDialog').open||input||event.altKey)return;
+    if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){
+      if(measurePoints.length||savedMeasurements.length||dimensionGraphics.length){event.preventDefault();undoMeasurement()}return;
+    }
+    if(event.ctrlKey||event.metaKey)return;
+    const key=event.key.toLowerCase();
+    const action=event.shiftKey&&key==='h'?'show':({h:'hide',delete:'hide',backspace:'hide',i:'isolate',m:'measure',d:'dims',g:'grid',a:'axis',u:'undo',f:'fit',' ':'reset',1:'iso',2:'top',3:'front',4:'right',5:'left',6:'back',7:'bottom'})[key];
+    if(!action)return;
+    event.preventDefault();
+    if(action==='show')showAll();
+    else if(action==='hide'){
+      if(!selectedNodes.size)return toast(language()==='en'?'Select a part first':'Bitte zuerst ein Bauteil auswählen.');
+      for(const node of selectedNodes)node.obj.visible=false;
+      updateTree();updateDimensions();
+    }
+    else if(action==='isolate')isolateSelection();
+    else if(action==='measure')$('measureButton').click();
+    else if(action==='dims')addAutoDimensions();
+    else if(action==='grid')$('gridButton').click();
+    else if(action==='undo')undoMeasurement();
+    else if(action==='axis')toggleAxisReference();
+    else if(action==='fit')fitToObject(selected?.obj||modelRoot);
+    else if(action==='reset'){showAll();fitToObject(modelRoot);selectNode(null);updateTree()}
+    else setView(action);
+  });
+  const observer=new MutationObserver(scheduleLocalization);observer.observe(document.querySelector('.app'),{subtree:true,childList:true,characterData:true});
+  translateVisibleUI();
+  // Offer guidance on first use, and keep it available with F1 / ?. Do not interfere with installed S-Parameter PWA.
+  if(localStorage.getItem('cadview-guide-v1')!=='dismissed')requestAnimationFrame(openHelp);
+}
+
 // UI wiring
 $('openButton').addEventListener('click',openFileDialog);
 $('emptyOpen').addEventListener('click',openFileDialog);
@@ -1014,7 +1359,7 @@ $('clearSelectionButton').addEventListener('click',()=>{selectNode(null);updateT
 document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>setView(el.dataset.view)));
 $('gridButton').addEventListener('click',()=>{const next=!grid.visible;grid.visible=next;axes.visible=next;$('gridButton').classList.toggle('active',next);$('gridButton').setAttribute('aria-pressed',String(next))});
 $('wireframeButton').addEventListener('click',()=>{edgesEnabled=!edgesEnabled;showEdges(edgesEnabled);$('wireframeButton').classList.toggle('active',edgesEnabled);$('wireframeButton').setAttribute('aria-pressed',String(edgesEnabled))});
-$('measureButton').addEventListener('click',()=>{measuring=!measuring;clearMeasure();canvas.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast('Messmodus: zwei Punkte auf dem Modell anklicken.')});
+$('measureButton').addEventListener('click',()=>{measuring=!measuring;clearMeasure();canvas.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast(language()==='en'?'Measure: click two points. Magnetic snapping is enabled.':'Messen: Zwei Punkte anklicken. Magnetischer Fang ist aktiviert.')});
 $('sectionButton').addEventListener('click',()=>{clipEnabled=!clipEnabled;$('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection();$('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled))});
 $('sectionRange').addEventListener('input',updateSection);
 for(const id of ['sectionAxis','sectionInvert','sectionNx','sectionNy','sectionNz','section2Axis','section2Range','section2Invert']) $(id).addEventListener('input',updateSection);
@@ -1049,7 +1394,7 @@ window.addEventListener('dragleave',e=>{if(e.relatedTarget===null||!document.ele
 window.addEventListener('drop',e=>{e.preventDefault();$('dropOverlay').classList.add('hidden');const f=e.dataTransfer?.files?.[0];if(f)loadFile(f)});
 window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='o'){e.preventDefault();openFileDialog()}
-  if(e.key==='Escape'){if(measuring){measuring=false;$('measureButton').classList.remove('active');clearMeasure();canvas.style.cursor='grab'}else{selectNode(null);updateTree()}closeMobilePanels()}
+  if(e.key==='Escape' && !$('helpDialog').open){if(measuring){measuring=false;$('measureButton').classList.remove('active');clearMeasure();canvas.style.cursor='grab'}else{selectNode(null);updateTree()}closeMobilePanels()}
   if(e.key.toLowerCase()==='f')fitToObject(selected?.obj||modelRoot);
 });
 
@@ -1068,11 +1413,19 @@ $('renderButton').addEventListener('click',()=>{ $('studioToggle').checked=!$('s
 $('studioToggle').addEventListener('change',e=>setStudio(e.target.checked));
 $('highResScreenshot').addEventListener('click',screenshotHighRes);
 $('dimensionButton').addEventListener('click',addAutoDimensions);
+$('undoMeasureButton').addEventListener('click',undoMeasurement);
+$('undoLastMeasurement').addEventListener('click',undoMeasurement);
+$('toggleMeasuresButton').addEventListener('click',toggleMeasurements);
+$('toggleMeasurementVisibility').addEventListener('click',toggleMeasurements);
 $('measureBoundsButton').addEventListener('click',addAutoDimensions);
 $('clearAllMeasurements').addEventListener('click',()=>{clearSavedMeasurements();clearAutoDimensions();toast('Alle Bemaßungen entfernt.')});
 $('measureUnits').addEventListener('change',refreshMeasurementDisplays);
+canvas.addEventListener('pointermove',e=>{if(!measuring)return;if(cadence.hovering)return;cadence.hovering=true;requestAnimationFrame(()=>{cadence.hovering=false;showSnapPreview(e)})});
+canvas.addEventListener('pointerleave',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
+$('measureSnap').addEventListener('change',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
 $('installButton').addEventListener('click',promptInstallation);
 initializePWA();
+setupHelpAndLocalization();
 loadRotationPresets();
 setLightTheme(localStorage.getItem('cadview-theme')==='light');
 createDemo();resize();animate();
