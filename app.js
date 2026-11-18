@@ -1083,7 +1083,7 @@ function createDimensionSprite(label){
   c.fillStyle=lightTheme?'rgba(255,255,255,.94)':'rgba(15,36,50,.92)';
   c.strokeStyle=lightTheme?'rgba(27,145,146,.6)':'rgba(72,214,208,.75)';c.lineWidth=3;
   c.beginPath();c.roundRect(3,3,506,98,13);c.fill();c.stroke();
-  c.fillStyle=lightTheme?'#163c4e':'#e0fefa';c.font='600 33px system-ui';
+  c.fillStyle=lightTheme?'#163c4e':'#e0fefa';c.font='600 58px system-ui';
   c.textAlign='center';c.textBaseline='middle';c.fillText(label.slice(0,30),256,53);
   const texture=new THREE.CanvasTexture(cv);texture.colorSpace=THREE.SRGBColorSpace;
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));
