@@ -1404,6 +1404,37 @@ function screenshotHighRes(){
     toast(`PNG: ${output.width} × ${output.height} px`);
   }catch(err){renderer.setPixelRatio(old);resize();toast('Bildexport: '+err.message,true)}
 }
+// Installed Edge PWA: receive Windows Explorer files locally via File Handling API.
+const cadLaunchHandles=[];
+let cadLaunchProcessing=false;
+async function processCadLaunchFiles(){
+  if(cadLaunchProcessing||!cadLaunchHandles.length)return;
+  cadLaunchProcessing=true;
+  try{
+    const incoming=cadLaunchHandles.splice(0);
+    const file=await incoming.at(-1).getFile();
+    if(!['stp','step','igs','iges','brep','stl','obj','glb','gltf'].includes(getFileType(file))){
+      throw new Error('Unsupported 3D file extension');
+    }
+    await loadFile(file);
+    if(incoming.length>1)toast(language()==='en'?'Several files: showing the latest one.':'Mehrere Dateien: Die zuletzt geöffnete Datei wird angezeigt.');
+  }catch(error){
+    console.error('CADVIEW OS file handling',error);
+    toast((language()==='en'?'Unable to open file: ':'Datei konnte nicht geöffnet werden: ')+String(error?.message||error),true);
+  }finally{
+    cadLaunchProcessing=false;
+    if(cadLaunchHandles.length)void processCadLaunchFiles();
+  }
+}
+function initializePwaFileHandling(){
+  if(!window.launchQueue||typeof window.launchQueue.setConsumer!=='function')return;
+  window.launchQueue.setConsumer(params=>{
+    const handles=Array.from(params?.files||[]).filter(h=>h&&typeof h.getFile==='function');
+    if(!handles.length)return;
+    cadLaunchHandles.push(...handles);
+    void processCadLaunchFiles();
+  });
+}
 function initializePWA(){
   if('serviceWorker' in navigator&&location.protocol==='https:'){
     navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Offline-Service-Worker:',e));
@@ -1917,6 +1948,7 @@ function safeStartup(name,fn){
   }
 }
 safeStartup('PWA',initializePWA);
+safeStartup('Windows file handling',initializePwaFileHandling);
 safeStartup('help/localization',setupHelpAndLocalization);
 safeStartup('saved presets',loadRotationPresets);
 safeStartup('measurement appearance',setupMeasurementAppearance);
