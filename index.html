@@ -21,7 +21,7 @@
 <body>
 <div class="app">
 <header class="topbar">
-<div aria-label="CADVIEW Studio" class="brand"><span class="brand-mark"><span class="brand-cube">◇</span></span><span class="brand-name">CAD<span>VIEW</span></span><span class="brand-suffix">STUDIO</span><span class="brand-badge">BETA 1.4.2</span></div>
+<div aria-label="CADVIEW Studio" class="brand"><span class="brand-mark"><span class="brand-cube">◇</span></span><span class="brand-name">CAD<span>VIEW</span></span><span class="brand-suffix">STUDIO</span><span class="brand-badge">BETA 1.4.3</span></div>
 <div class="top-actions"><label class="lang-control" title="Sprache / Language"><span>🌐</span><select aria-label="Sprache / Language" id="languageSelect"><option value="de">DE</option><option value="en">EN</option></select></label>
 <button class="top-btn primary" id="openButton" type="button"><span class="b-icon">↥</span> Modell öffnen</button>
 <button class="top-btn" id="demoButton" title="Beispielbaugruppe anzeigen" type="button">Demo</button><button class="top-btn" id="themeButton" title="Helles/Dunkles Design umschalten" type="button">☀ Hell</button><button class="top-btn" id="installButton" title="CADVIEW als App installieren" type="button">⊞ Installieren</button>
@@ -35,7 +35,7 @@
 <button data-export="obj"><strong>OBJ</strong><span>Geometrie ohne MTL-Datei</span></button><button data-export="step"><strong>STEP (Original)</strong><span>Unveränderte CAD-Datei; Dreh-Export noch nicht verfügbar</span></button><button data-export="project"><strong>Projekt JSON</strong><span>Rotationen, Kategorien, Materialien, Maße</span></button>
 </div>
 </div>
-<button class="top-btn help-link" id="helpButton" title="Hilfe und Tastenkürzel / Help and shortcuts" type="button">? Hilfe</button>
+<button class="top-btn help-link" id="helpButton" title="Hilfe und Tastenkürzel / Help and shortcuts" aria-label="Hilfe und Tastenkürzel / Help and shortcuts" type="button">?</button>
 </div>
 </header>
 <div class="workspace">
@@ -130,6 +130,6 @@
 <label class="help-option"><input checked="" id="skipOnboarding" type="checkbox"/> Diese Hilfe beim Start nicht erneut anzeigen</label>
 <div class="help-actions"><button class="panel-action primary-action" id="helpConfirm" type="button">Verstanden</button></div>
 </dialog>
-<script src="./app.js?v=1.4.2" type="module"></script>
+<script src="./app.js?v=1.4.3" type="module"></script>
 <script defer src="./gui.js?v=1.4.1"></script></body>
 </html>
