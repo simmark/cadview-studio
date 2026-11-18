@@ -208,9 +208,9 @@ Auf Basis der gemeldeten Edge-PWA-Probleme wurden die folgenden Bereiche gezielt
 
 ### Qualitätssicherung
 
-- **Manuelles Testprotokoll:** [QA-TESTPROTOKOLL.md](./QA-TESTPROTOKOLL.md) mit 23 nachvollziehbaren Funktionsprüfungen und Freigaberegel.
+- **Manuelles Testprotokoll:** [QA-TESTPROTOKOLL.md](./QA-TESTPROTOKOLL.md) mit 25 nachvollziehbaren Funktionsprüfungen und Freigaberegel.
 - **Automatische statische Prüfung:** `node tests/check-release.mjs`; GitHub-Workflow `.github/workflows/cadview-static-qa.yml`.
-- **Optionaler echter Chromium-WebGL-Smoke-Test:** `tests/browser-smoke.mjs` im GitHub-Workflow `.github/workflows/cadview-browser-smoke.yml` (unter **Actions → CADVIEW browser WebGL smoke test (manual) → Run workflow** starten). Testet Demo-Orbit, Sofortanzeigen, Explosionsansicht, Schnitt, automatische Bemaßung und das Export-Popup. Benötigt Internet zum Laden von Three.js und Software-WebGL im GitHub-Runner. Firmen-STEP-Dateien werden dabei **nicht** hochgeladen.
+- **Echter Chromium-WebGL-Smoke-Test:** `tests/browser-smoke.mjs` im GitHub-Workflow `.github/workflows/cadview-browser-smoke.yml` (wird jetzt bei Änderungen am Viewer-Code auf `main` automatisch gestartet; alternativ unter **Actions → CADVIEW browser WebGL smoke test → Run workflow**). Testet Demo-Orbit, Sofortanzeigen, Explosionsansicht, Schnitt, automatische Bemaßung und das Export-Popup. Benötigt Internet zum Laden von Three.js und Software-WebGL im GitHub-Runner. Firmen-STEP-Dateien werden dabei **nicht** hochgeladen.
 - **Prüfstatus:** Quellcode- und DOM-Verknüpfungsprüfung bestanden. Ein vollständiger interaktiver WebGL-Test auf der installierten Edge-PWA ist **noch nicht bestätigt**. Die App nicht als vollständig regressionstested ausgeben, bevor die manuellen Fälle erledigt sind.
 
 ## Beta 1.4.5 – Auswahl und Tastatur-H sofort sichtbar
