@@ -1,0 +1,143 @@
+/* CADVIEW Studio 1.4 – focused engineering-workspace redesign */
+:root{
+  --cad-accent:#0baba8;
+  --cad-accent-soft:rgba(12,171,168,.09);
+  --cad-radius:9px;
+}
+body{font-size:13px}
+.app{min-width:320px}
+.topbar{height:68px;min-height:68px;gap:14px;padding:0 19px;box-shadow:0 1px 0 rgba(12,31,44,.04)}
+.brand{min-width:224px;gap:9px}
+.brand-name{letter-spacing:.25px;font-weight:800;font-size:19px}
+.brand-suffix{letter-spacing:1.5px;font-size:9px}
+.brand-badge{letter-spacing:.6px;margin-left:4px}
+.top-actions{display:flex;align-items:center;flex:1;justify-content:flex-end;min-width:0;gap:7px}
+.top-btn{min-height:35px;padding:9px 11px;font-size:11px;font-weight:650;border-radius:7px}
+.top-btn.primary{min-height:39px;padding-inline:15px}
+.top-btn#installButton{min-height:35px}
+.lang-control{height:35px}
+.workspace{grid-template-columns:clamp(245px,17vw,282px) minmax(350px,1fr) clamp(305px,22vw,360px)}
+.sidebar-left,.sidebar-right{min-width:0}
+.sidebar-title{height:70px;min-height:70px;padding:15px 15px 11px}
+.sidebar-title h2{font-size:15px}
+.file-card{margin:0 11px 15px;padding:11px}
+.tree-scroll{padding:0 8px 14px}
+.tree-node{min-height:30px;font-size:11px;border-radius:5px}
+.tree-name{font-weight:580}
+.tree-tools{margin:0 10px 10px}
+.left-bottom{padding:10px;border-top:1px solid var(--line)}
+.left-bottom .quick-grid button{padding:9px 5px;font-size:10px}
+.viewport-shell{min-width:0}
+.viewport-toolbar{flex:none;min-height:62px;padding:8px 12px;display:flex;align-items:center;gap:7px;background:var(--panel);flex-wrap:wrap}
+.view-toggle{display:flex;gap:3px;min-width:0;flex-shrink:0}
+.view-toggle button{min-height:32px;padding:7px 10px;font-size:11px}
+.viewport-reset{border:1px solid var(--line);background:var(--soft);color:var(--text);border-radius:6px;min-height:32px;padding:7px 9px;font-size:10px;font-weight:700;white-space:nowrap}
+.viewport-reset:hover,.viewport-reset:focus-visible{border-color:var(--cyan);color:var(--cyan)}
+.toolbar-right{flex:1 1 325px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px}
+.toolbar-btn{min-height:32px;min-width:32px;padding:7px 9px;font-size:10px}
+.canvas-area{background:#e1e9ef;isolation:isolate;min-height:0}
+#cadCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
+.axis-widget{z-index:5;background:transparent;bottom:38px;left:12px}
+.axis-mode{font-size:10px;padding:4px 7px}
+#orientationCanvas{width:92px;height:92px}
+.axis-title{font-size:8px}
+.viewport-hint{bottom:12px;left:50%;max-width:55%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewport-bottom{min-height:38px;overflow:hidden;font-size:10px}
+.viewport-bottom .status-left{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.viewport-bottom #statusText{overflow:hidden;text-overflow:ellipsis}
+.status-help{font:inherit;font-weight:750;border:1px solid var(--line);background:var(--soft);color:var(--muted);border-radius:5px;padding:4px 7px;cursor:pointer}
+.status-help:hover{color:var(--cyan)}
+/* Right pane: only one focused tool group visible at a time. */
+.sidebar-right .sidebar-title{height:70px;min-height:70px}
+.sidebar-right .right-scroll{padding:0 12px 20px;scrollbar-width:thin}
+.inspector-head{margin:0 0 9px;padding:10px 11px;min-height:64px}
+.inspector-head strong{font-size:12px}
+.inspector-subhead{font-size:10px;line-height:1.5;color:var(--muted);margin:0 2px 11px}
+.inspector-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;padding:4px;background:var(--soft);border:1px solid var(--line);border-radius:9px;position:sticky;top:0;z-index:20;box-shadow:0 1px 5px rgba(4,19,35,.1)}
+.inspector-tab{background:transparent;border:1px solid transparent;border-radius:6px;min-height:35px;font-size:10px;font-weight:730;color:var(--muted);padding:5px 2px;cursor:pointer;white-space:nowrap}
+.inspector-tab:hover{color:var(--text);background:var(--panel2)}
+.inspector-tab.active{background:var(--panel);border-color:var(--line);box-shadow:0 1px 3px rgba(0,0,0,.07);color:var(--cyan)}
+.inspector-content{padding:16px 3px 0}
+.inspector-panel{display:none;animation:cad-panel-in .16s ease}
+.inspector-panel.active{display:block}
+.inspector-panel[hidden]{display:none!important}
+@keyframes cad-panel-in{from{opacity:.2;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.inspector-panel .panel-label-row{margin:0 0 14px;color:var(--text);font-size:10px;font-weight:850}
+.inspector-panel .panel-label-row:not(:first-child){margin-top:24px;padding-top:17px;border-top:1px solid var(--line)}
+.inspector-panel .dimension-note{line-height:1.5;font-size:10px}
+.inspector-panel .field-grid{gap:8px}
+.inspector-panel select,.inspector-panel input[type=text],.inspector-panel input[type=number]{min-height:36px}
+.inspector-panel .control-item{padding-block:5px}
+.inspector-panel .panel-action{min-height:35px;border-radius:7px}
+.inspector-panel .range-row{margin-top:18px}
+#panel-measure .dimensions>div{padding:10px 11px}
+#panel-measure .measure-buttons{margin-top:8px}
+#panel-transform .button-row{display:flex;flex-wrap:wrap;gap:5px}
+#panel-transform .button-row>*{flex:1;min-width:66px}
+/* Faster onboarding instead of a blocking modal. */
+.welcome-tips{position:absolute;z-index:9;top:16px;left:16px;max-width:min(342px,calc(100% - 32px));border:1px solid var(--line);background:var(--panel);border-radius:10px;box-shadow:0 12px 38px #0002;color:var(--text);padding:16px}
+.welcome-label{font-size:9px;font-weight:800;letter-spacing:1.2px;color:var(--cyan);margin-bottom:7px}
+.welcome-tips strong{display:block;font-size:14px}
+.welcome-tips p{font-size:11px;line-height:1.6;margin:7px 0 12px;color:var(--muted)}
+.welcome-tips kbd{padding:2px 5px;border:1px solid var(--line);background:var(--soft);border-radius:4px;color:var(--text)}
+.welcome-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.welcome-actions button{background:var(--soft);border:1px solid var(--line);color:var(--text);font-size:10px;border-radius:6px;padding:8px;cursor:pointer}
+.welcome-actions button:first-child{background:var(--cyan);color:#08272f;border-color:var(--cyan);font-weight:800}
+.welcome-actions button:last-child{margin-left:auto}
+/* Persistent, actionable error instead of blank viewport without explanation. */
+.render-notice{position:absolute;z-index:14;top:14px;left:50%;transform:translateX(-50%);width:min(96%,590px);background:#fff6ec;border:1px solid #d2a273;border-radius:8px;color:#754518;display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 12px;box-shadow:0 8px 24px rgba(33,23,8,.13);font-size:11px;line-height:1.5}
+.render-notice[data-fatal=true]{background:#fff0ef;border-color:#e4a29d;color:#833935}
+.render-notice button{font-size:10px;font-weight:800;flex:none;padding:7px 9px;border:1px solid currentColor;color:inherit;border-radius:6px;background:transparent}
+/* Help is available on demand, not forced on load. Keyboard search is two-column on desktop. */
+.help-dialog{width:min(720px,calc(100vw - 30px));max-height:min(84dvh,760px);padding:22px;border:1px solid var(--line);background:var(--panel);border-radius:12px}
+.help-head{margin-bottom:5px}
+.help-head h2{font-size:19px}
+.shortcut-grid{gap:0 22px;margin:14px 0;padding:0}
+.shortcut-item{font-size:11px;padding:8px 0;gap:10px}
+.help-dialog .help-foot{line-height:1.6}
+/* Strong consistency for the light theme. */
+:root[data-theme=light]{--cad-accent:#048e91}
+:root[data-theme=light] .inspector-tabs{background:#edf3f7}
+:root[data-theme=light] .inspector-tab.active{background:#fff;color:#047b80}
+:root[data-theme=light] .welcome-tips{background:#fff}
+:root[data-theme=light] .viewport-toolbar{background:#fff}
+:root[data-theme=light] .viewport-reset{background:#f4f8fb}
+@media(max-width:1450px){
+ .workspace{grid-template-columns:244px minmax(330px,1fr) 312px}
+ .topbar{padding:0 12px}.top-actions{gap:5px}.top-btn{padding:8px 9px}
+ .toolbar-right{flex-basis:300px}
+ .viewport-reset{font-size:10px}
+ .view-toggle button{padding-inline:8px}
+}
+@media(max-width:1160px){
+ .workspace{grid-template-columns:238px minmax(0,1fr)}
+ .sidebar-right{position:fixed;right:0;top:68px;bottom:0;width:min(365px,94vw);z-index:80;transform:translateX(105%);box-shadow:-14px 0 55px #001f3280}
+ .sidebar-right.open{transform:translateX(0)}
+ .sidebar-right .mobile-close{display:block}
+ .toolbar-right{flex-basis:100%;justify-content:flex-start}
+ .top-actions #screenshotButton{display:none}
+}
+@media(max-width:760px){
+ .topbar{height:59px;min-height:59px}
+ .brand{min-width:auto}.brand-suffix,.brand-badge{display:none}.brand-name{font-size:16px}
+ .top-actions #demoButton,.top-actions #themeButton,.top-actions #installButton,.top-actions .top-sep{display:none}
+ .top-actions{gap:4px}
+ .top-btn.primary{padding-inline:10px;min-height:33px}
+ .sidebar-left{position:fixed;top:59px;bottom:54px;left:0;width:min(305px,91vw);z-index:90;transform:translateX(-105%)}
+ .sidebar-right{top:59px;bottom:54px}
+ .workspace{display:grid;grid-template-columns:minmax(0,1fr)}
+ .viewport-toolbar{min-height:49px;padding:7px;gap:5px}
+ .view-toggle{overflow-x:auto;max-width:calc(100% - 98px)}
+ .view-toggle button{padding:6px 8px}
+ .viewport-reset{font-size:10px}
+ .toolbar-right{justify-content:flex-start;flex-basis:100%}
+ .toolbar-btn{padding:6px}
+ .welcome-tips{top:12px;left:10px;padding:13px}
+ .mobile-bottom-bar{height:54px}
+ .status-help{display:none}
+ .axis-widget{left:3px;bottom:18px;transform:scale(.82);transform-origin:left bottom}
+}
+@media(max-width:390px){
+ .brand-name{font-size:14px}.top-actions .lang-control{display:none}
+ .top-actions #openButton{display:none}
+}
