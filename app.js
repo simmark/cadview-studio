@@ -53,6 +53,10 @@ let measureMarkers = [];
 let measureLine = null;
 let measurementsVisible = true;
 let snapPreview = null;
+// Display-only preferences: no impact on imported CAD geometry or measured values.
+const measurementAppearance = {labelPercent:130,snapPx:13,labelStyle:'dark'};
+const MEASURE_DRAG_THRESHOLD = 6;
+
 const cadence = {frame:0,hovering:false};
 const geometryEdgeCache = new WeakMap();
 let selected = null;
@@ -638,16 +642,30 @@ function screenIntersections(evt){
   return raycaster.intersectObjects(getMeshes(modelRoot).filter(isActuallyVisible),false).filter(hit=>!clipEnabled || sectionPlane.distanceToPoint(hit.point)>=-0.00001);
 }
 let pointerDown = null;
-interactionSurface.addEventListener('pointerdown',e=>{if(e.button===0)pointerDown={x:e.clientX,y:e.clientY};if($('inputFeedback'))$('inputFeedback').textContent=language()==='en'?'Pointer received · drag to orbit':'Eingabe erkannt · ziehen zum Drehen';});
+interactionSurface.addEventListener('pointerdown',e=>{
+  if(e.button===0)pointerDown={id:e.pointerId,x:e.clientX,y:e.clientY,maxMotion:0};
+  if($('inputFeedback'))$('inputFeedback').textContent=language()==='en'?'Pointer received · click or drag':'Eingabe erkannt · klicken oder ziehen';
+});
 interactionSurface.addEventListener('pointerup',e=>{
-  if(e.button!==0||!pointerDown)return;
-  const delta=Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y);
-  pointerDown=null;if(delta>5||!modelRoot)return;
+  const down=pointerDown;
+  if(e.button!==0||!down||down.id!==e.pointerId)return;
+  pointerDown=null;
+  const displacement=Math.hypot(e.clientX-down.x,e.clientY-down.y);
+  // A completed drag must NEVER accidentally create a measurement on release,
+  // even if the cursor returned to its initial location before mouseup.
+  const traveled=Math.max(displacement,down.maxMotion,activeDrag?.moved||0);
+  if(traveled>(measuring?MEASURE_DRAG_THRESHOLD:5)||!modelRoot)return;
   const hits=screenIntersections(e);
-  if(measuring){if(hits.length)addMeasurePoint(snapMeasurePoint(hits[0],e));else toast('Bitte direkt auf eine Modellfläche klicken.');return}
+  if(measuring){
+    if(hits.length)addMeasurePoint(snapMeasurePoint(hits[0],e));
+    else toast('Bitte direkt auf eine Modellfläche klicken.');
+    return;
+  }
   selectNode(hits.length?closestNodeFromObject(hits[0].object):null,e.ctrlKey||e.metaKey);
   updateTree();
 });
+window.addEventListener('pointercancel',()=>{pointerDown=null});
+window.addEventListener('blur',()=>{pointerDown=null});
 
 function openFileDialog(){$('fileInput').click()}
 function getFileType(file){return file.name.split('.').pop().toLowerCase()}
@@ -1618,6 +1636,9 @@ window.addEventListener('pointermove',e=>{
   if(!dx&&!dy)return;
   d.x=e.clientX;d.y=e.clientY;
   d.moved+=Math.hypot(dx,dy);
+  if(pointerDown?.id===e.pointerId){
+    pointerDown.maxMotion=Math.max(pointerDown.maxMotion,Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y));
+  }
   pointerDiagnostics.moves++;
   if(d.mode==='model'&&d.button===0&&!d.pan&&!measuring){
     // Incremental rotations preserve the complete assembly and each selected component's mesh.
@@ -1628,8 +1649,10 @@ window.addEventListener('pointermove',e=>{
   } else if(d.pan){
     cameraPanPixels(dx,dy);
     feedbackText((language()==='en'?'Camera pan':'Kamera verschieben')+' · '+pointerDiagnostics.pans);
-  } else if(!measuring){
+  } else if(!measuring || (d.moved>MEASURE_DRAG_THRESHOLD)){
+    // In measurement mode, dragging still orbits. Only a short click adds a point.
     cameraOrbitPixels(dx,dy);
+    if(measuring)$('snapMarker')?.classList.add('hidden');
     feedbackText((language()==='en'?'Camera rotated':'Kamera gedreht')+' · '+pointerDiagnostics.orbits);
   }
   if(d.moved>4)e.preventDefault();
@@ -1652,7 +1675,7 @@ interactionSurface.addEventListener('wheel',e=>{
 $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   const rect=interactionSurface.getBoundingClientRect();
   const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
-  const report={version:'1.4.5',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
+  const report={version:'1.4.6',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
     size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
     mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,animationTicks,
     lastRenderFailure:lastRenderFailure.slice(0,900),lastStartupFailure:lastStartupFailure.slice(0,900),
@@ -1780,7 +1803,18 @@ $('toggleMeasurementVisibility').addEventListener('click',toggleMeasurements);
 $('measureBoundsButton').addEventListener('click',addAutoDimensions);
 $('clearAllMeasurements').addEventListener('click',()=>{clearSavedMeasurements();clearAutoDimensions();toast('Alle Bemaßungen entfernt.')});
 $('measureUnits').addEventListener('change',refreshMeasurementDisplays);
-interactionSurface.addEventListener('pointermove',e=>{if(!measuring)return;if(cadence.hovering)return;cadence.hovering=true;requestAnimationFrame(()=>{cadence.hovering=false;showSnapPreview(e)})});
+interactionSurface.addEventListener('pointermove',e=>{
+  if(!measuring)return;
+  if(pointerDown&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>MEASURE_DRAG_THRESHOLD){
+    $('snapMarker')?.classList.add('hidden');snapPreview=null;return;
+  }
+  if(cadence.hovering)return;
+  cadence.hovering=true;
+  requestAnimationFrame(()=>{
+    cadence.hovering=false;
+    if(!pointerDown || pointerDown.maxMotion<=MEASURE_DRAG_THRESHOLD)showSnapPreview(e);
+  });
+});
 interactionSurface.addEventListener('pointerleave',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
 $('measureSnap').addEventListener('change',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
 $('installButton').addEventListener('click',promptInstallation);
