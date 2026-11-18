@@ -1501,6 +1501,16 @@ const HOTKEYS=[
  ['Alt (while measuring)','Temporarily turn off snapping','Fangpunkte kurz deaktivieren'],
 ];
 const TRANSLATIONS={
+  'ANZEIGE & FANGSYMBOL':'DISPLAY & SNAP MARKER',
+  'Maßtext-Größe':'Dimension label size',
+  'Snap-Symbolgröße':'Snap marker size',
+  'Kontrast der Maßlabels':'Dimension label contrast',
+  'Dunkel · hoher Kontrast':'Dark · high contrast',
+  'Hell · hoher Kontrast':'Light · high contrast',
+  'Messmodus: Klicken = Punkt setzen; Ziehen = Kamera drehen.':'Measure mode: Click to set a point; drag to orbit the camera.',
+  'Windows-Dateizuordnung':'Windows file association',
+  'CADVIEW unter Windows für .stp, .step, .igs, .iges, .stl, .obj und .glb als Standard-App auswählen.':'Choose CADVIEW as the default Windows app for .stp, .step, .igs, .iges, .stl, .obj and .glb.',
+
  'Modell öffnen':'Open model','Demo':'Demo','Hell':'Light','Dunkel':'Dark','Installieren':'Install',
  'Screenshot':'Screenshot','Exportieren':'Export','Hilfe':'Help','Modellstruktur':'Model structure',
  'PROJEKT':'PROJECT','BAUTEILE':'PARTS','SCHNELLZUGRIFF':'QUICK ACTIONS',
@@ -1796,7 +1806,7 @@ $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
   const report={version:'1.4.6',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
     size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
-    mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,animationTicks,
+    mode:manipulationMode,measuring,measurementAppearance:{...measurementAppearance},events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,animationTicks,
     lastRenderFailure:lastRenderFailure.slice(0,900),lastStartupFailure:lastStartupFailure.slice(0,900),
     lastRenderAgeMs:lastRenderAt?Math.round(performance.now()-lastRenderAt):null,
     webglContextLost:renderer.getContext().isContextLost(),
