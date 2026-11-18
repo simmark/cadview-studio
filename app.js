@@ -508,15 +508,15 @@ function updateTree(){
   root.append(frag);
   if(!root.children.length){const el=document.createElement('div');el.className='tree-no-results';el.textContent='Keine passenden Bauteile';root.append(el)}
 }
-function showAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=true);updateTree();updateDimensions()}
-function hideAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=false);updateTree();updateDimensions()}
+function showAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=true);updateTree();updateDimensions();renderNow('all visible')}
+function hideAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=false);updateTree();updateDimensions();renderNow('all hidden')}
 function isolateSelection(){if(!selectedNodes.size){toast('Bitte zuerst mindestens ein Bauteil auswählen.');return}
   allNodes.forEach(n=>n.obj.visible=false);
   for(const node of selectedNodes){
     node.obj.visible=true;node.obj.traverse(o=>o.visible=true);
     for(let p=node.parent;p;p=p.parent)p.obj.visible=true;
   }
-  updateTree();updateDimensions();toast(`${selectedNodes.size} ausgewählte Elemente isoliert.`);
+  updateTree();updateDimensions();renderNow('isolate selection');toast(`${selectedNodes.size} ausgewählte Elemente isoliert.`);
 }
 function applyFlagsToMesh(mesh){
   if(!mesh.isMesh)return;
@@ -542,6 +542,7 @@ function showEdges(enabled){
     }
     if(edgesByMesh.has(mesh))edgesByMesh.get(mesh).visible=enabled;
   });
+  renderNow('show edges');
 }
 function getNormal(axis,prefix){
   if(axis==='x')return new THREE.Vector3(-1,0,0);
@@ -565,6 +566,7 @@ function updateSection(){
   applySectionParameters(sectionPlane2,$('section2Axis').value,Number($('section2Range').value),$('section2Invert').checked,'section2');
   $('sectionValue').textContent=$('sectionRange').value+' %';
   $('customNormalFields').classList.toggle('hidden',$('sectionAxis').value!=='custom');
+  renderNow('section changed');
 }
 function updateExplode(){
   if(!modelRoot)return;
@@ -588,8 +590,10 @@ function updateExplode(){
     dir.applyQuaternion(parentQ.invert());
     n.obj.position.copy(basePositions.get(n.obj)||new THREE.Vector3()).add(dir.multiplyScalar(scale));
   });
+  modelRoot.updateWorldMatrix(true,true);
   refreshSelectionBox();
   updateDimensions();
+  renderNow('explode changed');
 }
 function refreshSelectionBox(){
   if(!selectionBox)return;
@@ -793,6 +797,8 @@ function renderNow(reason=''){
     // An explicit redraw is essential after user input, as RAF can be suspended by
     // an installed PWA window or if model initialization previously threw.
     camera.updateMatrixWorld(true);
+    // Always size screen-space annotations before rendering, including direct UI updates.
+    try{updateMeasurementScale()}catch(error){console.warn('Measurement scale',error)}
     renderer.render(scene,camera);
     framesRendered++;
     lastRenderAt=performance.now();
@@ -841,7 +847,7 @@ function animate(){
   if(wasContextLost||document.hidden)return;
   if(!renderNow('animation frame'))return;
   try{
-    refreshSelectionBox();updateOrientationWidget();updateMeasurementScale();
+    refreshSelectionBox();updateOrientationWidget();
     lastOverlayFailure='';
   }catch(error){
     const description=String(error?.message||error);
@@ -1156,11 +1162,11 @@ function worldPerPixel(p){
 function updateMeasurementScale(){
   const resizeGroup=g=>{if(!g||!g.visible)return;g.traverse(o=>{
     if(o.userData.pixelRadius){const size=worldPerPixel(o.getWorldPosition(new THREE.Vector3()))*o.userData.pixelRadius;o.scale.setScalar(size)}
-    if(o.isSprite&&o.userData.pixelWidth){const pp=worldPerPixel(o.getWorldPosition(new THREE.Vector3()));o.scale.set(o.userData.pixelWidth*pp,o.userData.pixelHeight*pp,1)}
+    if(o.isSprite&&o.userData.pixelWidth){const anchor=o.userData.anchor||o.position;const pp=worldPerPixel(anchor);o.scale.set(o.userData.pixelWidth*pp,o.userData.pixelHeight*pp,1);if(o.userData.pixelOffset&&o.userData.anchor){o.position.copy(anchor).addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize(),pp*o.userData.pixelOffset)}}
   })};
   for(const g of dimensionGraphics)resizeGroup(g);
   for(const m of savedMeasurements)resizeGroup(m.graphic);
-  for(const marker of measureMarkers){marker.scale.setScalar(worldPerPixel(marker.position)*3.5)}
+  for(const marker of measureMarkers){marker.scale.setScalar(worldPerPixel(marker.position)*(marker.userData.pixelRadius||2.4))}
 }
 const snap2d=p=>{const v=p.clone().project(camera),r=canvas.getBoundingClientRect();return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,z:v.z}};
 function candidatePoint(hit,event){
@@ -1231,6 +1237,7 @@ function setLightTheme(light){
   grid.material.opacity=lightTheme?.3:1;
   getMeshes(modelRoot).forEach(m=>{if(edgesByMesh.has(m))edgesByMesh.get(m).material.color.set(lightTheme?'#294658':'#8dabb7')});
   try{localStorage.setItem('cadview-theme',lightTheme?'light':'dark')}catch{}
+  renderNow('theme changed');
 }
 async function setStudio(enabled){
   $('studioToggle').checked=!!enabled;$('renderButton').classList.toggle('active',!!enabled);
