@@ -229,3 +229,22 @@ Korrekturen in Beta 1.4.5:
 ### Freigabe
 
 Nach dem Laden muss `BETA 1.4.5` im Header erscheinen. Ohne jede Mausbewegung muss `animationTicks` nach kurzer Zeit steigen. Auswahl einer Baugruppe/Komponente und **H** müssen sofort sichtbar reagieren. Die präzisen Browser-Testfälle stehen in `QA-TESTPROTOKOLL.md` (QA-05, QA-24, QA-25); der Chromium-Smoke-Test prüft Auswahl, H und die autonome Render-Schleife. **Code/Syntax geprüft, vollständiger Edge-PWA-Livetest noch offen.**
+
+## Beta 1.4.6 – Messmodus, lesbare Bemaßungen und Windows-Dateizuordnung
+
+**Messwerkzeuge:** Im Messmodus setzt ein kurzer Klick einen Messpunkt. Sobald die linke Maustaste über eine Bewegungsschwelle von **6 px** hinaus bewegt wird, steuert Ziehen weiterhin die **Kamera**. Loslassen nach einer Ziehbewegung erzeugt keinen versehentlichen Messpunkt – auch dann nicht, wenn der Zeiger zum Startpunkt zurückkehrt. Rechtsziehen verschiebt die Ansicht; das Mausrad zoomt.
+
+**Einstellungen → Messen:** Maßtext-Größe **70–200 %**, Snap-Vorschausymbol **8–22 px** und Labelkontrast **Dunkel/Hell**. Änderungen erscheinen sofort und werden ausschließlich in `localStorage` unter `cadview-measure-appearance-v1` auf dem Gerät gespeichert. Gespeicherte Messpunkte bleiben klein und unabhängig davon. Die Bemaßungswerte werden nicht verändert; Snap-Punkte bleiben Mesh-basierte Näherungen.
+
+### CADVIEW als Standardprogramm unter Windows 11
+
+Microsoft Edge unterstützt für installierte PWAs Dateihandler über `manifest.webmanifest → file_handlers` und `window.launchQueue.setConsumer()`. CADVIEW registriert jetzt die Dateiendungen **.stp, .step, .igs, .iges, .brep, .stl, .obj, .glb und .gltf**. Die ausgewählte lokale Datei wird direkt an dieselbe Importfunktion wie `Modell öffnen` übergeben; die Datei wird dabei nicht auf Simonlation-Server übertragen.
+
+1. CADVIEW Studio in Edge als eigenständige PWA installieren. Weil die Dateihandler erst nachträglich zum Manifest hinzugefügt wurden, muss die installierte CADVIEW-App möglicherweise **neu installiert** werden. Vor dem Deinstallieren eigene Projektvorlagen sichern und bei Edge keine Websitedaten löschen.
+2. Eine Datei, z. B. `modell.stp`, im Windows-Explorer mit **Rechtsklick → Öffnen mit → Andere App auswählen → CADVIEW Studio** öffnen. Erlaubnisabfrage von Edge bestätigen.
+3. Wenn gewünscht **Immer diese App verwenden** auswählen oder unter **Windows Einstellungen → Apps → Standard-Apps** den Dateityp `.stp` suchen und CADVIEW Studio zuordnen. Das ist eine **Benutzerentscheidung**; die Website darf keine Windows-Standardeinstellung selbst ändern.
+4. Eine echte Datei doppelklicken. CADVIEW soll sie ohne zweiten Dateidialog einlesen. Bei einem nicht angebotenen Eintrag die App in Edge aktualisieren beziehungsweise neu installieren und die Registrierungsberechtigung prüfen.
+
+Nur installierte PWAs in kompatiblen Browsern unterstützen diese Dateizuordnung. Ein normaler GitHub-Pages-Tab darf aus Sicherheitsgründen nicht automatisch lokale Dateien bei Explorer-Doppelklicks öffnen. Die GitHub-Implementierung ist geprüft; die Windows-Dateizuordnung muss auf dem jeweiligen Gerät praktisch bestätigt werden.
+
+**Tests:** `tests/check-release.mjs` prüft Dateihandler, Manifest-Scope, Messsteuerung und die neuen UI-IDs. `tests/browser-smoke.mjs` prüft Maßtext-/Snap-Slider und Kameradrehung bei aktiviertem Messmodus. `QA-TESTPROTOKOLL.md` enthält nun **30 Fälle**.
