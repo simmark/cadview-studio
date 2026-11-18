@@ -1252,6 +1252,62 @@ function updateMeasurementScale(){
   for(const m of savedMeasurements)resizeGroup(m.graphic);
   for(const marker of measureMarkers){marker.scale.setScalar(worldPerPixel(marker.position)*(marker.userData.pixelRadius||2.4))}
 }
+// Display-only preferences stored on the CADVIEW origin, never sent anywhere.
+const MEASUREMENT_PREFS_KEY='cadview-measure-appearance-v1';
+function syncMeasurementAppearance(repaintTextures=false){
+  const ratio=measurementAppearance.labelPercent/100;
+  for(const group of [...dimensionGraphics,...savedMeasurements.map(m=>m.graphic)]){
+    if(!group)continue;
+    group.traverse(object=>{
+      if(!object.isSprite||!object.userData.dimensionLabel)return;
+      object.userData.pixelWidth=object.userData.basePixelWidth*ratio;
+      object.userData.pixelHeight=object.userData.basePixelHeight*ratio;
+      object.userData.pixelOffset=object.userData.pixelHeight/2+9;
+      if(repaintTextures){
+        const old=object.material.map;
+        object.material.map=dimensionLabelTexture(object.userData.dimensionLabel);
+        object.material.needsUpdate=true;
+        old?.dispose();
+      }
+    });
+  }
+  $('snapMarker')?.style.setProperty('--cad-snap-size',measurementAppearance.snapPx+'px');
+  $('measureLabelSizeValue').textContent=measurementAppearance.labelPercent+' %';
+  $('measureSnapSizeValue').textContent=measurementAppearance.snapPx+' px';
+  updateMeasurementScale();
+  renderNow('measurement appearance changed');
+}
+function setupMeasurementAppearance(){
+  try{
+    const stored=JSON.parse(localStorage.getItem(MEASUREMENT_PREFS_KEY)||'null');
+    if(stored&&typeof stored==='object'){
+      const pct=Number(stored.labelPercent),px=Number(stored.snapPx);
+      if(Number.isFinite(pct))measurementAppearance.labelPercent=THREE.MathUtils.clamp(Math.round(pct/10)*10,70,200);
+      if(Number.isFinite(px))measurementAppearance.snapPx=THREE.MathUtils.clamp(Math.round(px),8,22);
+      if(stored.labelStyle==='dark'||stored.labelStyle==='light')measurementAppearance.labelStyle=stored.labelStyle;
+    }
+  }catch(error){console.warn('CADVIEW measurement settings unavailable',error)}
+  const labelInput=$('measureLabelSize'),snapInput=$('measureSnapSize'),styleInput=$('measureLabelStyle');
+  labelInput.value=String(measurementAppearance.labelPercent);
+  snapInput.value=String(measurementAppearance.snapPx);
+  styleInput.value=measurementAppearance.labelStyle;
+  const save=()=>{
+    try{localStorage.setItem(MEASUREMENT_PREFS_KEY,JSON.stringify(measurementAppearance))}catch{}
+  };
+  labelInput.addEventListener('input',()=>{
+    measurementAppearance.labelPercent=Number(labelInput.value);
+    syncMeasurementAppearance();save();
+  });
+  snapInput.addEventListener('input',()=>{
+    measurementAppearance.snapPx=Number(snapInput.value);
+    syncMeasurementAppearance();save();
+  });
+  styleInput.addEventListener('change',()=>{
+    measurementAppearance.labelStyle=styleInput.value==='light'?'light':'dark';
+    syncMeasurementAppearance(true);save();
+  });
+  syncMeasurementAppearance(true);
+}
 const snap2d=p=>{const v=p.clone().project(camera),r=canvas.getBoundingClientRect();return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,z:v.z}};
 function candidatePoint(hit,event){
   const mode=$('measureSnap').value;
@@ -1863,6 +1919,7 @@ function safeStartup(name,fn){
 safeStartup('PWA',initializePWA);
 safeStartup('help/localization',setupHelpAndLocalization);
 safeStartup('saved presets',loadRotationPresets);
+safeStartup('measurement appearance',setupMeasurementAppearance);
 safeStartup('theme',()=>setLightTheme((()=>{try{return localStorage.getItem('cadview-theme')==='light'}catch{return false}})()));
 try{
   createDemo();
