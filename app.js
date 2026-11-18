@@ -310,6 +310,19 @@ function finalizeModel(title,sub){
   updateTree();fitToObject(modelRoot);
   selectNode(null);
   repositionGrid();
+  // Geometry may load successfully while the camera/frustum or WebGL pipeline draws nothing.
+  // We check actual rendered triangles, not whether the assembly tree is populated.
+  recoveryAttempts=0;
+  setTimeout(()=>{
+    if(!modelRoot||!getMeshes(modelRoot).some(isActuallyVisible)||wasContextLost)return;
+    if(renderer.info.render.triangles===0){
+      recoveryAttempts++;
+      if(recoveryAttempts===1){
+        try{fitToObject(modelRoot);resize();renderer.render(scene,camera)}catch(err){console.error('Recovery render error',err)}
+      }
+      if(renderer.info.render.triangles===0){renderNotice(language()==='en'?'Geometry loaded but nothing is visible. Try Reset view.':'Geometrie geladen, aber nichts sichtbar. Bitte Ansicht zurücksetzen.');}
+    }
+  },900);
   if(edgesEnabled)showEdges(true);
 }
 function repositionGrid(){
@@ -720,7 +733,66 @@ function screenshot(){
 function resize(){const r=viewport.getBoundingClientRect();if(r.width<=0||r.height<=0)return;
   renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
 new ResizeObserver(resize).observe(viewport);
-function animate(){requestAnimationFrame(animate);controls.update();refreshSelectionBox();updateOrientationWidget();updateMeasurementScale();renderer.render(scene,camera)}
+// The core renderer MUST keep running even when a measurement/HUD widget fails.
+// v1.3 could leave an empty viewport after a nonessential frame exception.
+let lastRenderFailure = '';
+let lastOverlayFailure = '';
+let wasContextLost = false;
+let recoveryAttempts = 0;
+let framesRendered = 0;
+function renderNotice(message, isFatal=false){
+  const panel=$('renderNotice'); if(!panel)return;
+  panel.classList.remove('hidden');
+  $('renderNoticeText').textContent=message;
+  panel.dataset.fatal=String(isFatal);
+}
+function clearRenderNotice(){ $('renderNotice')?.classList.add('hidden'); }
+canvas.addEventListener('webglcontextlost',ev=>{ev.preventDefault();wasContextLost=true;renderNotice('Die 3D-Grafikverbindung wurde unterbrochen. Bitte Ansicht neu laden.',true)});
+canvas.addEventListener('webglcontextrestored',()=>{wasContextLost=false;lastRenderFailure='';clearRenderNotice();resize();fitToObject(modelRoot)});
+function recoverViewport(){
+  if(!modelRoot)return;
+  // Clear filters that can hide every part, without modifying the CAD data.
+  clipEnabled=false;$('sectionButton')?.classList.remove('active');
+  if($('sectionRange'))$('sectionRange').disabled=true;
+  getMeshes(modelRoot).forEach(m=>{ const mats=Array.isArray(m.material)?m.material:[m.material];mats.forEach(mat=>{mat.clippingPlanes=[];mat.needsUpdate=true}) });
+  modelRoot.traverse(o=>{if(!o.isLineSegments)o.visible=true});
+  for(const n of partNodes)n.obj.visible=true;
+  grid.visible=true;
+  if($('gridButton'))$('gridButton').classList.add('active');
+  const dir=new THREE.Vector3(1,-1,.8).normalize();
+  controls.target.set(0,0,0);camera.position.copy(dir.multiplyScalar(200));camera.up.set(0,0,1);
+  fitToObject(modelRoot);setView('iso');resize();updateTree();clearRenderNotice();
+  if(wasContextLost) renderNotice('3D-Kontext verloren. Lade diese Seite mit Strg+F5 neu.',true);
+  else toast(language()==='en'?'Model and camera reset.':'Modell und Kamera zurückgesetzt.');
+}
+function animate(){
+  requestAnimationFrame(animate);
+  if(wasContextLost)return;
+  try{
+    controls.update();
+    // Core render comes FIRST: a faulty overlay can no longer blank the viewport.
+    renderer.render(scene,camera);framesRendered++;
+    lastRenderFailure='';
+  }catch(error){
+    const description=String(error?.message||error);
+    if(description!==lastRenderFailure){lastRenderFailure=description;console.error('CADVIEW render failure',error);renderNotice('3D-Renderfehler: '+description,true)}
+    return;
+  }
+  try{
+    refreshSelectionBox();updateOrientationWidget();updateMeasurementScale();
+    lastOverlayFailure='';
+  }catch(error){
+    const description=String(error?.message||error);
+    if(description!==lastOverlayFailure){lastOverlayFailure=description;console.warn('CADVIEW HUD failure (3D continues)',error)}
+  }
+}
+window.addEventListener('keydown',e=>{
+  if(e.defaultPrevented||e.ctrlKey||e.metaKey||e.altKey||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)||$('helpDialog')?.open)return;
+  if(e.key==='0'){e.preventDefault();recoverViewport()}
+});
+$('viewportReset')?.addEventListener('click',recoverViewport);
+$('renderRecover')?.addEventListener('click',recoverViewport);
+
 
 // CADVIEW Studio v1.2: editing, materials, grouping, measurements and PWA
 function applyCategory(){
@@ -1076,7 +1148,7 @@ function setLightTheme(light){
   scene.background=lightTheme?lightColor:darkColor;
   grid.material.opacity=lightTheme?.3:1;
   getMeshes(modelRoot).forEach(m=>{if(edgesByMesh.has(m))edgesByMesh.get(m).material.color.set(lightTheme?'#294658':'#8dabb7')});
-  localStorage.setItem('cadview-theme',lightTheme?'light':'dark');
+  try{localStorage.setItem('cadview-theme',lightTheme?'light':'dark')}catch{}
 }
 async function setStudio(enabled){
   $('studioToggle').checked=!!enabled;$('renderButton').classList.toggle('active',!!enabled);
@@ -1340,7 +1412,7 @@ function setupHelpAndLocalization(){
   const observer=new MutationObserver(scheduleLocalization);observer.observe(document.querySelector('.app'),{subtree:true,childList:true,characterData:true});
   translateVisibleUI();
   // Offer guidance on first use, and keep it available with F1 / ?. Do not interfere with installed S-Parameter PWA.
-  if(localStorage.getItem('cadview-guide-v1')!=='dismissed')requestAnimationFrame(openHelp);
+  // Welcome tips are non-modal in GUI 1.4; help is explicitly available with F1 / ?.
 }
 
 // UI wiring
@@ -1427,5 +1499,5 @@ $('installButton').addEventListener('click',promptInstallation);
 initializePWA();
 setupHelpAndLocalization();
 loadRotationPresets();
-setLightTheme(localStorage.getItem('cadview-theme')==='light');
+setLightTheme((()=>{try{return localStorage.getItem('cadview-theme')==='light'}catch{return false}})());
 createDemo();resize();animate();
