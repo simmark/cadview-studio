@@ -29,6 +29,13 @@ try {
   assert.ok(initial.renderFrames > 0,'Renderer must have drawn at least one frame');
   assert.ok(initial.renderTriangles > 0,'Demo must render triangles');
   console.log('PASS: demo rendered',initial.renderFrames,initial.renderTriangles);
+  assert.equal(initial.loopStarted,true,'Render loop not started');
+  const tickStart=initial.animationTicks;
+  await page.waitForTimeout(350);
+  const idle=await getDiag();
+  assert.ok(idle.animationTicks>tickStart,'Animation loop must advance even without any pointer input');
+  assert.ok(idle.renderFrames>initial.renderFrames,'Canvas must repaint autonomously when idle');
+  console.log('PASS: autonomous animation loop is alive',idle.animationTicks);
 
   const screenshot=()=>page.locator('#cadCanvas').screenshot();
   const area=await page.locator('#cadInteractionLayer').boundingBox();
