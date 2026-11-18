@@ -162,3 +162,24 @@ body{font-size:13px}
 .cad-interaction-layer.is-dragging{cursor:grabbing}
 #inputFeedback{min-width:160px;max-width:calc(100% - 25px);pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:950px){.interaction-mode{order:1}#inputDiagnosticsButton{order:4}}
+
+/* CADVIEW 1.4.4 — controlled popover and fine-grained CAD measurement cues. */
+body > #exportMenu.export-menu{
+  position:fixed!important;
+  z-index:100000!important;
+  top:0;left:0;
+  width:min(320px,calc(100vw - 20px));
+  max-height:calc(100dvh - 20px);
+  overflow-y:auto;overscroll-behavior:contain;
+  border-radius:10px;
+  box-shadow:0 20px 55px rgba(0,0,0,.45);
+  scrollbar-width:thin;
+}
+body > #exportMenu.export-menu .export-select{position:sticky;top:-7px;z-index:1;background:var(--panel2)}
+body > #exportMenu.export-menu [data-export]{position:relative;z-index:0}
+#snapMarker.snap-marker{width:8px;height:8px;border-width:1.5px;box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+#snapMarker.snap-marker[data-kind="vertex"]{border-radius:0}
+#snapMarker.snap-marker[data-kind="midpoint"]{border-radius:50%}
+#snapMarker.snap-marker[data-kind="quarter"]{border-radius:0 75% 0 0}
+#snapMarker.snap-marker[data-kind="faceCenter"]{border-radius:50%;background:transparent}
+@media(max-width:650px){body > #exportMenu.export-menu{max-height:calc(100dvh - 65px)}}
