@@ -1,8 +1,8 @@
 /* CADVIEW Studio PWA. Same-origin shell cache; CDN resources cached opportunistically. */
-const VERSION = 'cadview-studio-1.4.4';
-const RUNTIME = 'cadview-deps-1.4.4';
+const VERSION = 'cadview-studio-1.4.5';
+const RUNTIME = 'cadview-deps-1.4.5';
 const APP_FILES = [
-  './','./index.html','./styles.css?v=1.2.0','./app.js?v=1.4.4',
+  './','./index.html','./styles.css?v=1.2.0','./app.js?v=1.4.5',
   './occt-worker.js?v=1.2.0','./manifest.webmanifest?v=1.3.0','./enhancements.css?v=1.3.0','./rework.css?v=1.4.4','./gui.js?v=1.4.1',
   './icons/icon-192.png','./icons/icon-512.png','./README.md'
 ];
