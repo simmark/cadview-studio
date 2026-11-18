@@ -19,7 +19,7 @@ Ziel: Kamera, STEP-Import, Live-Änderungen, Bemaßung und Export bei jedem Rele
 | QA-02 | Demo links ziehen, rechts ziehen, Mausrad | Kamera dreht, verschiebt, zoomt; Darstellung unmittelbar sichtbar | ☐ |
 | QA-03 | Ansicht 3D / Oben / Vorne / Links wechseln | Jeder Klick ändert sofort die Kamera ohne weitere Bewegung | ☐ |
 | QA-04 | STEP-Datei importieren | Baugruppe und 13 Teile erscheinen; Demo wird ersetzt; drehen und auswählen möglich | ☐ |
-| QA-05 | Einzelteil über Augen-Symbol aus-/einblenden | Teil verschwindet/erscheint **sofort** ohne Kamerabewegung | ☐ |
+| QA-05 | Teil im Baum markieren, danach per Augen-Symbol oder **H** ausblenden | Auswahlrahmen erscheint **sofort**, danach verschwindet das Teil **sofort** ohne Kamerabewegung | ☐ |
 | QA-06 | Teil isolieren, danach „Alles einpassen“ / Sichtbarkeit | Isolieren und erneutes Anzeigen sofort, ohne verlorene Geometrie | ☐ |
 | QA-07 | Explosionsregler 0 → 40 → 100 → 0 bewegen | Positionen ändern sich **während** des Ziehens; Rückkehr auf 0 ohne Restversatz | ☐ |
 | QA-08 | Schnitt 1 aktivieren und X/Y/Z, Invertierung, Schieberegler variieren | Modell wird **bei jedem Eingabeschritt** live abgeschnitten; keine Kamerabewegung nötig | ☐ |
@@ -38,6 +38,8 @@ Ziel: Kamera, STEP-Import, Live-Änderungen, Bemaßung und Export bei jedem Rele
 | QA-21 | DE/EN wählen und Hilfe per ? öffnen | Wichtige Funktionen verständlich, Hilfe sichtbar und nicht vom Menü überdeckt | ☐ |
 | QA-22 | `edge://apps` prüfen | CADVIEW Studio und S-Parameter Analyzer bleiben zwei getrennte Installationen | ☐ |
 | QA-23 | Browser-Konsole während der Aktionen prüfen | Keine neuen unhandled errors oder WebGL-Kontextverluste | ☐ |
+| QA-24 | Diagnose direkt nach Start und 1 s später kopieren | `loopStarted: true`, `animationTicks` und `renderFrames` steigen auch ohne Mausbewegung | ☐ |
+| QA-25 | Beschädigte gespeicherte Drehvorlagen / blockiertes localStorage simulieren | Demo und Renderloop starten trotzdem; nur Vorlagen-Funktion darf ausfallen | ☐ |
 
 ## Messungsdarstellung – visuelle Akzeptanz
 
@@ -71,4 +73,4 @@ Konsolenfehler: ...
 
 ## Freigaberegel
 
-Eine Beta ist erst dann für den Alltag freigegeben, wenn **QA-01 bis QA-23** getestet, die kritischen Fälle **QA-02, QA-04, QA-05, QA-07, QA-08, QA-11, QA-12, QA-15 und QA-20** erfolgreich sind und keine neuen Fehler auftreten. Bei kritischem Fehler Release nicht als „vollständig getestet“ bezeichnen.
+Eine Beta ist erst dann für den Alltag freigegeben, wenn **QA-01 bis QA-25** getestet, die kritischen Fälle **QA-02, QA-04, QA-05, QA-07, QA-08, QA-11, QA-12, QA-15 und QA-20** erfolgreich sind und keine neuen Fehler auftreten. Bei kritischem Fehler Release nicht als „vollständig getestet“ bezeichnen.
