@@ -41,12 +41,24 @@ grid.position.z = -8;
 scene.add(grid);
 const axes = new THREE.AxesHelper(46); axes.position.set(-130,-130,-8); scene.add(axes);
 const sectionPlane = new THREE.Plane(new THREE.Vector3(0,0,-1),0);
+const sectionPlane2 = new THREE.Plane(new THREE.Vector3(-1,0,0),0);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const measurePoints = [];
 let measureMarkers = [];
 let measureLine = null;
 let selected = null;
+const selectedNodes = new Set();
+let lastTreeSelection = null;
+let sourceStepText = null;
+let stepExportCompatible = true;
+const stepGlobalTransform = new THREE.Matrix4();
+let fileIdentity = 'demo';
+const savedMeasurements = [];
+let dimensionGraphics = [];
+let deferredInstall = null;
+let studioEnvironment = null;
+let lightTheme = false;
 let modelRoot = null;
 let worker = null;
 let workerTask = null;
@@ -106,7 +118,8 @@ function setLoading(show,text='',detail=''){
 function updateStatus(s){$('statusText').textContent=s}
 function getMeshes(node){const arr=[];if(node)node.traverse(o=>{if(o.isMesh)arr.push(o)});return arr;}
 function resetModel(){
-  clearMeasure(); selectNode(null);
+  clearMeasure(); clearSavedMeasurements(); clearAutoDimensions(); selectNode(null);
+  sourceStepText=null;stepGlobalTransform.identity();stepExportCompatible=true;fileIdentity='demo';
   if(selectionBox){scene.remove(selectionBox);selectionBox.geometry.dispose();selectionBox.material.dispose();selectionBox=null;}
   if(modelRoot){scene.remove(modelRoot);modelRoot.traverse(o=>{
     if(o.geometry)o.geometry.dispose();
@@ -114,12 +127,21 @@ function resetModel(){
     if(edgesByMesh.has(o)){const edge=edgesByMesh.get(o);edge.geometry.dispose();edge.material.dispose();edgesByMesh.delete(o);}
   });}
   modelRoot = new THREE.Group(); modelRoot.name='Modell'; scene.add(modelRoot);
-  allNodes=[];partNodes=[];idCounter=0;renderedMeshCount=0;tris=0; selected=null;
+  allNodes=[];partNodes=[];idCounter=0;renderedMeshCount=0;tris=0; selected=null;selectedNodes.clear();lastTreeSelection=null;
   explodeFactor=0; $('explodeRange').value=0; $('explodeValue').textContent='0 %';
   $('treeSearch').value='';
 }
+function inferCategory(name=''){
+  const s=String(name).toLocaleLowerCase('de');
+  if(/pin|kontakt|terminal|lead|anschluss|contact/.test(s))return 'Pins';
+  if(/coil|winding|wicklung|spule|wire|kupfer/.test(s))return 'Wicklung';
+  if(/core|ferrit|kern|magnet/.test(s))return 'Kern';
+  if(/case|housing|body|gehäuse|cover|kappe|deckel/.test(s))return 'Gehäuse';
+  if(/isol|dielectric|kunststoff/.test(s))return 'Isolation';
+  return 'Sonstige';
+}
 function registerNode(obj, parent=null, isPart=false){
-  const node={id:++idCounter,obj,parent,children:[],isPart,collapsed:false};
+  const node={id:++idCounter,obj,parent,children:[],isPart,collapsed:false,category:inferCategory(obj.name)};
   nodeByObject.set(obj,node);
   basePositions.set(obj,obj.position.clone());
   if(parent)parent.children.push(node);
@@ -308,26 +330,47 @@ function setView(type){
   const b=contentBounds(modelRoot);if(b.isEmpty())return;
   const center=b.getCenter(new THREE.Vector3());
   const dist=Math.max(b.getSize(new THREE.Vector3()).length()*1.6,10);
-  const dirs={iso:new THREE.Vector3(1,-1,.9), top:new THREE.Vector3(0,0,1),front:new THREE.Vector3(0,-1,.001),right:new THREE.Vector3(1,0,.001)};
+  const dirs={iso:new THREE.Vector3(1,-1,.9), top:new THREE.Vector3(0,0,1),front:new THREE.Vector3(0,-1,.001),right:new THREE.Vector3(1,0,.001),left:new THREE.Vector3(-1,0,.001),back:new THREE.Vector3(0,1,.001),bottom:new THREE.Vector3(0,0,-1)};
   const dir=dirs[type]||dirs.iso;
   controls.target.copy(center);camera.position.copy(center).add(dir.normalize().multiplyScalar(dist));
-  camera.up.set(0,0,1); if(type==='top')camera.up.set(0,1,0);
+  camera.up.set(0,0,1); if(type==='top')camera.up.set(0,1,0);if(type==='bottom')camera.up.set(0,-1,0);
   camera.lookAt(center);controls.update();
   document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===type));
 }
 function closestNodeFromObject(obj){let v=obj;while(v&&v!==modelRoot){if(nodeByObject.has(v))return nodeByObject.get(v);v=v.parent;}return null}
-function selectNode(node){
-  selected=node;
+function selectionBounds(){
+  if(!selectedNodes.size)return contentBounds(modelRoot);
+  const box=new THREE.Box3();
+  for(const n of selectedNodes)box.union(contentBounds(n.obj));
+  return box;
+}
+function selectNode(node, multi=false){
+  if(!multi)selectedNodes.clear();
+  if(node){
+    if(multi && selectedNodes.has(node)) selectedNodes.delete(node);
+    else selectedNodes.add(node);
+  }
+  selected=node && selectedNodes.has(node) ? node : ([...selectedNodes].at(-1)||null);
   if(selectionBox){scene.remove(selectionBox);selectionBox.geometry.dispose();selectionBox.material.dispose();selectionBox=null;}
-  if(node && nodeVisible(node)){selectionBox=new THREE.BoxHelper(node.obj,0x45e2dc);selectionBox.material.depthTest=false;selectionBox.material.transparent=true;selectionBox.material.opacity=.93;selectionBox.renderOrder=99;scene.add(selectionBox);}
-  document.querySelectorAll('.tree-node.selected').forEach(el=>el.classList.remove('selected'));
-  if(node){document.querySelector(`.tree-node[data-id="${node.id}"]`)?.classList.add('selected');
-    $('selectedName').textContent=node.obj.name||'Bauteil';
-    $('selectedInfo').textContent=node.isPart?'Bauteil / Komponente':'Baugruppe';
-  }else{$('selectedName').textContent='Gesamtes Modell';$('selectedInfo').textContent='Kein einzelnes Bauteil ausgewählt';}
+  const bound=selectionBounds();
+  if(selectedNodes.size && !bound.isEmpty()){
+    selectionBox=new THREE.Box3Helper(bound,0x45e2dc);
+    selectionBox.material.depthTest=false;selectionBox.material.transparent=true;selectionBox.material.opacity=.93;
+    selectionBox.renderOrder=99;scene.add(selectionBox);
+  }
+  document.querySelectorAll('.tree-node').forEach(el=>el.classList.toggle('selected',selectedNodes.has(allNodes.find(n=>String(n.id)===el.dataset.id))));
+  const count=selectedNodes.size;
+  $('selectedName').textContent=count===0?'Gesamtes Modell':count===1?selected.obj.name:`${count} Elemente ausgewählt`;
+  $('selectedInfo').textContent=count===0?'Kein einzelnes Bauteil ausgewählt':count>1?'Gemeinsame Material- und Kategorie-Einstellungen':selected.isPart?'Bauteil / Komponente':'Baugruppe';
+  $('partCategory').value=count===1?(selected.category||'Sonstige'):'';
   updateMaterialControls();updateDimensions();
 }
-function getTargetMeshes(){return getMeshes(selected?.obj||modelRoot)}
+function selectedPartNodes(){return [...selectedNodes];}
+function getTargetMeshes(){
+  const nodes=selectedPartNodes();
+  if(!nodes.length)return getMeshes(modelRoot);
+  return [...new Set(nodes.flatMap(n=>getMeshes(n.obj)))];
+}
 function getFirstMaterial(){const mesh=getTargetMeshes()[0];if(!mesh)return null;return Array.isArray(mesh.material)?mesh.material[0]:mesh.material}
 function updateMaterialControls(){const m=getFirstMaterial();if(!m)return;
   $('materialPreset').value='original';$('materialColor').value='#'+m.color.getHexString();
@@ -341,6 +384,7 @@ function applyMaterialPatch(patch){
     const mats=Array.isArray(mesh.material)?mesh.material:[mesh.material];
     mats.forEach(mat=>{
       if(patch.color!=null)mat.color.set(patch.color);
+      if(patch.materialName!=null)mat.name=patch.materialName;
       if(patch.metalness!=null)mat.metalness=patch.metalness;
       if(patch.roughness!=null)mat.roughness=patch.roughness;
       if(patch.opacity!=null){mat.opacity=patch.opacity;mat.transparent=mat.opacity<.999;mat.depthWrite=mat.opacity>.96;}
@@ -360,8 +404,7 @@ function restoreMaterials(){
   updateMaterialControls(); $('materialPreset').value='original';toast('Originalmaterialien wiederhergestellt.');
 }
 function updateDimensions(){
-  const obj=selected?.obj||modelRoot;
-  const b=contentBounds(obj);
+  const b=selectionBounds();
   const size=b.getSize(new THREE.Vector3());
   const formatter=n=>Number.isFinite(n)?n.toLocaleString('de-DE',{maximumFractionDigits:2})+' '+(currentUnit==='Einheiten'?'':currentUnit):'—';
   $('dimX').textContent=b.isEmpty()?'—':formatter(size.x);
@@ -377,14 +420,18 @@ function updateTree(){
   function render(node,depth){
     if(term&&!matching(node))return;
     const row=document.createElement('div');row.className='tree-node';row.dataset.id=node.id;
-    if(selected===node)row.classList.add('selected');
+    if(selectedNodes.has(node))row.classList.add('selected');
     if(!nodeVisible(node))row.classList.add('dimmed');
     const indent=document.createElement('span');indent.className='tree-indent';indent.style.setProperty('--indent',Math.min(depth,15)*13+'px');row.append(indent);
     const arrow=document.createElement('button');arrow.className='tree-arrow'+(node.children.length?'':' empty');arrow.textContent=node.collapsed&&!term?'▸':'▾';arrow.title='Bauteile ein-/ausklappen';arrow.addEventListener('click',e=>{e.stopPropagation();node.collapsed=!node.collapsed;updateTree()});row.append(arrow);
     const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.textContent=nodeVisible(node)?'◉':'◌';eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions()});row.append(eye);
     const icon=document.createElement('span');icon.className='tree-symbol'+(node.isPart?' mesh':'');icon.textContent=node.isPart?'⬡':'▤';row.append(icon);
     const name=document.createElement('span');name.className='tree-name';name.textContent=node.obj.name||'Unbenannt';name.title=node.obj.name;row.append(name);
-    row.addEventListener('click',()=>{selectNode(node);closeMobilePanels()});
+    row.addEventListener('click',e=>{
+      if(e.shiftKey&&lastTreeSelection){const a=allNodes.indexOf(lastTreeSelection),b=allNodes.indexOf(node);for(const n of allNodes.slice(Math.min(a,b),Math.max(a,b)+1))selectedNodes.add(n);selectedNodes.delete(node);selectNode(node,true);}
+      else selectNode(node,e.ctrlKey||e.metaKey);
+      lastTreeSelection=node;updateTree();if(!(e.ctrlKey||e.metaKey||e.shiftKey))closeMobilePanels();
+    });
     row.addEventListener('dblclick',()=>fitToObject(node.obj));
     row.addEventListener('contextmenu',e=>{e.preventDefault();selectNode(node);isolateSelection()});
     frag.append(row);
@@ -396,18 +443,19 @@ function updateTree(){
 }
 function showAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=true);updateTree();updateDimensions()}
 function hideAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=false);updateTree();updateDimensions()}
-function isolateSelection(){if(!selected){toast('Bitte zuerst ein Bauteil auswählen.');return}
+function isolateSelection(){if(!selectedNodes.size){toast('Bitte zuerst mindestens ein Bauteil auswählen.');return}
   allNodes.forEach(n=>n.obj.visible=false);
-  selected.obj.visible=true;
-  selected.obj.traverse(o=>o.visible=true);
-  for(let p=selected.parent;p;p=p.parent)p.obj.visible=true;
-  updateTree();updateDimensions();toast(`${selected.obj.name} isoliert.`);
+  for(const node of selectedNodes){
+    node.obj.visible=true;node.obj.traverse(o=>o.visible=true);
+    for(let p=node.parent;p;p=p.parent)p.obj.visible=true;
+  }
+  updateTree();updateDimensions();toast(`${selectedNodes.size} ausgewählte Elemente isoliert.`);
 }
 function applyFlagsToMesh(mesh){
   if(!mesh.isMesh)return;
   const mats=Array.isArray(mesh.material)?mesh.material:[mesh.material];
   for(const m of mats){
-    m.clippingPlanes=clipEnabled?[sectionPlane]:[];
+    m.clippingPlanes=clipEnabled?[sectionPlane,...($('section2Toggle')?.checked?[sectionPlane2]:[])]:[];
     if($('xrayToggle').checked){if(m.userData.beforeXray===undefined)m.userData.beforeXray={opacity:m.opacity,transparent:m.transparent,depthWrite:m.depthWrite};m.opacity=Math.min(m.opacity,.24);m.transparent=true;m.depthWrite=false;}
     else if(m.userData.beforeXray){Object.assign(m,m.userData.beforeXray);delete m.userData.beforeXray;}
     m.needsUpdate=true;
@@ -428,11 +476,28 @@ function showEdges(enabled){
     if(edgesByMesh.has(mesh))edgesByMesh.get(mesh).visible=enabled;
   });
 }
-function updateSection(){
+function getNormal(axis,prefix){
+  if(axis==='x')return new THREE.Vector3(-1,0,0);
+  if(axis==='y')return new THREE.Vector3(0,-1,0);
+  if(axis==='z')return new THREE.Vector3(0,0,-1);
+  const nx=Number($(prefix+'Nx').value)||0,ny=Number($(prefix+'Ny').value)||0,nz=Number($(prefix+'Nz').value)||0;
+  const v=new THREE.Vector3(nx,ny,nz);
+  return v.lengthSq()>.000001?v.normalize().negate():new THREE.Vector3(0,0,-1);
+}
+function applySectionParameters(plane,axis,percentage,invert,prefix){
   const b=baseBounds();if(b.isEmpty())return;
-  const f=Number($('sectionRange').value)/100;
-  const z=b.getCenter(new THREE.Vector3()).z+f*b.getSize(new THREE.Vector3()).z*.55;
-  sectionPlane.constant=z;
+  const n=getNormal(axis,prefix).multiplyScalar(invert?-1:1);
+  const center=b.getCenter(new THREE.Vector3()),span=b.getSize(new THREE.Vector3());
+  const halfExtent=(Math.abs(n.x)*span.x+Math.abs(n.y)*span.y+Math.abs(n.z)*span.z)/2;
+  // n·x + constant >=0 is kept. At 0, the plane passes through the center.
+  const offset=percentage/100*halfExtent;
+  plane.normal.copy(n);plane.constant= -n.dot(center) + offset;
+}
+function updateSection(){
+  applySectionParameters(sectionPlane,$('sectionAxis').value,Number($('sectionRange').value),$('sectionInvert').checked,'section');
+  applySectionParameters(sectionPlane2,$('section2Axis').value,Number($('section2Range').value),$('section2Invert').checked,'section2');
+  $('sectionValue').textContent=$('sectionRange').value+' %';
+  $('customNormalFields').classList.toggle('hidden',$('sectionAxis').value!=='custom');
 }
 function updateExplode(){
   if(!modelRoot)return;
@@ -456,8 +521,12 @@ function updateExplode(){
     dir.applyQuaternion(parentQ.invert());
     n.obj.position.copy(basePositions.get(n.obj)||new THREE.Vector3()).add(dir.multiplyScalar(scale));
   });
-  if(selectionBox)selectionBox.update();
+  refreshSelectionBox();
   updateDimensions();
+}
+function refreshSelectionBox(){
+  if(!selectionBox)return;
+  const b=selectionBounds();selectionBox.box.copy(b);selectionBox.visible=selectedNodes.size>0&&!b.isEmpty();
 }
 function baseBoundsForNode(obj){const b=new THREE.Box3();obj.updateWorldMatrix(true,true);obj.traverse(o=>{if(o.isMesh)b.expandByObject(o,true)});return b}
 function clearMeasure(){
@@ -475,11 +544,12 @@ function addMeasurePoint(pos){
   marker.position.copy(pos);marker.renderOrder=9;scene.add(marker);measureMarkers.push(marker);
   if(measurePoints.length===2){
     const dist=measurePoints[0].distanceTo(measurePoints[1]);
+    addSavedMeasurement(measurePoints[0],measurePoints[1]);
     const geo=new THREE.BufferGeometry().setFromPoints(measurePoints);
     measureLine=new THREE.Line(geo,new THREE.LineBasicMaterial({color:'#62e8dd',linewidth:2,depthTest:false}));measureLine.renderOrder=10;scene.add(measureLine);
-    $('measureLabel').textContent=`Gemessener Abstand: ${dist.toLocaleString('de-DE',{maximumFractionDigits:3})} ${currentUnit}`;
+    $('measureLabel').textContent=`Gemessener Abstand: ${formatMeasured(dist)} · ΔX ${formatMeasured(Math.abs(measurePoints[1].x-measurePoints[0].x))} · ΔY ${formatMeasured(Math.abs(measurePoints[1].y-measurePoints[0].y))} · ΔZ ${formatMeasured(Math.abs(measurePoints[1].z-measurePoints[0].z))}`;
     $('measureLabel').classList.remove('hidden');
-    toast(`Abstand: ${dist.toLocaleString('de-DE',{maximumFractionDigits:3})} ${currentUnit}`);
+    toast(`Abstand gespeichert: ${formatMeasured(dist)}`);
   }else{
     $('measureLabel').textContent='Punkt 1 gesetzt – bitte Punkt 2 anklicken';$('measureLabel').classList.remove('hidden');
   }
@@ -498,8 +568,8 @@ canvas.addEventListener('pointerup',e=>{
   const delta=Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y);
   pointerDown=null;if(delta>5||!modelRoot)return;
   const hits=screenIntersections(e);
-  if(measuring){if(hits.length)addMeasurePoint(hits[0].point);else toast('Bitte direkt auf eine Modellfläche klicken.');return}
-  selectNode(hits.length?closestNodeFromObject(hits[0].object):null);
+  if(measuring){if(hits.length)addMeasurePoint(snapMeasurePoint(hits[0],e));else toast('Bitte direkt auf eine Modellfläche klicken.');return}
+  selectNode(hits.length?closestNodeFromObject(hits[0].object):null,e.ctrlKey||e.metaKey);
   updateTree();
 });
 
@@ -516,14 +586,19 @@ async function loadFile(file){
     if(['step','stp','iges','igs','brep'].includes(ext)){
       const data=await parseWithWorker(file,ext);
       parseCadResult(data,file);
+      fileIdentity=[file.name,file.size,file.lastModified].join(':');
+      if(['step','stp'].includes(ext))sourceStepText=await file.text();
+      restoreSavedProjectIfPresent();
     }else{
       await loadMeshFile(file,ext);
+      fileIdentity=[file.name,file.size,file.lastModified].join(':');
+      restoreSavedProjectIfPresent();
     }
   }catch(err){console.error(err);toast('Import fehlgeschlagen: '+(err?.message||String(err)),true);updateStatus('Importfehler – bisheriges Modell bleibt erhalten, wenn möglich.');}
   finally{setLoading(false);$('fileInput').value='';}
 }
 async function parseWithWorker(file,format){
-  if(!worker){worker = new Worker('./occt-worker.js?v=1.0.1');worker.onerror = err=>{if(workerTask){workerTask.reject(new Error('CAD-Worker abgestürzt: '+(err.message||'Unbekannter Fehler')));workerTask=null}worker.terminate();worker=null};
+  if(!worker){worker = new Worker('./occt-worker.js?v=1.2.0');worker.onerror = err=>{if(workerTask){workerTask.reject(new Error('CAD-Worker abgestürzt: '+(err.message||'Unbekannter Fehler')));workerTask=null}worker.terminate();worker=null};
     worker.onmessage = e=>{const d=e.data;const task=workerTask;if(!task||task.id!==d.id)return;
       if(d.phase==='engine')setLoading(true,'CAD-Engine wird geladen …','Der OpenCascade-Parser wird beim ersten STEP/IGES-Import aus dem Internet geladen.');
       if(d.phase==='parsing')setLoading(true,'STEP/IGES wird konvertiert …','Die Originaldatei bleibt auf deinem Computer.');
@@ -582,7 +657,10 @@ async function exportModel(format){
   $('exportMenu').classList.add('hidden');
   setLoading(true,`Export als ${format.toUpperCase()} …`,'Sichtbare Bauteile und aktuelle Materialeinstellungen werden berücksichtigt.');
   try{
-    const output=clonedForExport();
+    if(format==='step'){exportRotatedStep();return;}
+    if(format==='project'){saveProject(true);return;}
+    const grouping=$('exportGrouping').value;
+    const output=format==='glb'&&grouping!=='original'?groupedForExport(grouping):clonedForExport();
     if(format==='glb'){
       output.rotation.x=-Math.PI/2; // export a glTF-conformant Y-up model
       output.scale.setScalar(currentUnit==='mm'?0.001:1); // glTF specifies meters; STEP/IGES is imported in mm
@@ -596,7 +674,7 @@ async function exportModel(format){
       download(new Blob([result],{type:'text/plain;charset=utf-8'}),filenameStem()+'.obj');
       toast('OBJ exportiert. Hinweis: Dieser Export enthält keine MTL-Materialdatei.');
     }
-    toast(format.toUpperCase()+' erfolgreich exportiert.');
+    if(format!=='step'&&format!=='project')toast(format.toUpperCase()+' erfolgreich exportiert.');
   }catch(err){console.error(err);toast('Export fehlgeschlagen: '+(err.message||err),true)}
   finally{setLoading(false)}
 }
@@ -607,8 +685,319 @@ function screenshot(){
 function resize(){const r=viewport.getBoundingClientRect();if(r.width<=0||r.height<=0)return;
   renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
 new ResizeObserver(resize).observe(viewport);
-function animate(){requestAnimationFrame(animate);controls.update();if(selectionBox){selectionBox.visible=!!selected&&nodeVisible(selected);if(selectionBox.visible)selectionBox.update();}renderer.render(scene,camera)}
+function animate(){requestAnimationFrame(animate);controls.update();refreshSelectionBox();renderer.render(scene,camera)}
 
+// CADVIEW Studio v1.2: editing, materials, grouping, measurements and PWA
+function applyCategory(){
+  if(!modelRoot)return;
+  const value=$('partCategory').value.trim().slice(0,80);
+  if(!value){toast('Bitte eine Kategorie eingeben.',true);return}
+  const target=selectedNodes.size?[...selectedNodes]:partNodes;
+  const affected=new Set(target);
+  target.forEach(n=>n.obj.traverse(o=>{const related=nodeByObject.get(o);if(related)affected.add(related)}));
+  affected.forEach(n=>{n.category=value;n.obj.userData.category=value});
+  updateTree();toast(`${affected.size} Komponenten zu „${value}“ zugeordnet.`);
+}
+function rotateActive(axis,angle){
+  if(!modelRoot||!Number.isFinite(angle)||Math.abs(angle)>3600){toast('Ungültiger Drehwinkel.',true);return}
+  if(!angle)return;
+  if(explodeFactor){$('explodeRange').value=0;updateExplode();}
+  const targets=selectedNodes.size?[...selectedNodes].filter(n=>![...selectedNodes].some(p=>p!==n&&nHasAncestor(n,p))).map(n=>n.obj):[modelRoot];
+  const b=new THREE.Box3();targets.forEach(o=>b.union(contentBounds(o)));
+  if(b.isEmpty()){toast('Keine sichtbaren Flächen zum Drehen.',true);return}
+  const pivot=b.getCenter(new THREE.Vector3());
+  const v=axis==='x'?new THREE.Vector3(1,0,0):axis==='y'?new THREE.Vector3(0,1,0):new THREE.Vector3(0,0,1);
+  const r=new THREE.Matrix4().makeRotationAxis(v,THREE.MathUtils.degToRad(angle));
+  const worldTransform=new THREE.Matrix4().makeTranslation(pivot.x,pivot.y,pivot.z).multiply(r).multiply(new THREE.Matrix4().makeTranslation(-pivot.x,-pivot.y,-pivot.z));
+  modelRoot.updateWorldMatrix(true,true);
+  targets.forEach(obj=>{
+    const parentWorld=obj.parent?obj.parent.matrixWorld:new THREE.Matrix4();
+    const localTransform=parentWorld.clone().invert().multiply(worldTransform).multiply(parentWorld);
+    obj.applyMatrix4(localTransform);
+    if(obj!==modelRoot)basePositions.set(obj,obj.position.clone());
+  });
+  if(selectedNodes.size)stepExportCompatible=false;
+  else stepGlobalTransform.premultiply(worldTransform);
+  modelRoot.updateWorldMatrix(true,true);
+  refreshSelectionBox();updateDimensions();updateSection();repositionGrid();
+  toast(`Rotation ${angle}° um ${axis.toUpperCase()} angewendet – Export berücksichtigt neue Ausrichtung.`);
+}
+function nHasAncestor(n,possibleParent){for(let p=n.parent;p;p=p.parent)if(p===possibleParent)return true;return false}
+function readTransform(o){return {position:o.position.toArray(),quaternion:o.quaternion.toArray(),scale:o.scale.toArray()}}
+function writeTransform(o,data){
+  if(!data||data.position?.length!==3||data.quaternion?.length!==4||data.scale?.length!==3)return;
+  if(![...data.position,...data.quaternion,...data.scale].every(Number.isFinite))return;
+  o.position.fromArray(data.position);o.quaternion.fromArray(data.quaternion);o.scale.fromArray(data.scale);o.updateMatrix();
+}
+function saveRotationPreset(){
+  const name=$('rotationPresetName').value.trim().slice(0,80);
+  if(!name){toast('Bitte einen Namen für die Vorlage eingeben.');return}
+  const presets=JSON.parse(localStorage.getItem('cadview-rotations')||'{}');
+  presets[name]={root:readTransform(modelRoot),nodes:allNodes.map(n=>({id:n.id,transform:readTransform(n.obj)})),stepTransform:stepGlobalTransform.toArray(),stepCompatible:stepExportCompatible};
+  localStorage.setItem('cadview-rotations',JSON.stringify(presets));loadRotationPresets();$('rotationPresetList').value=name;
+  toast('Drehvorlage „'+name+'“ gespeichert.');
+}
+function loadRotationPresets(){
+  const presets=JSON.parse(localStorage.getItem('cadview-rotations')||'{}');
+  const select=$('rotationPresetList');select.replaceChildren(new Option('Vorlage auswählen …',''));
+  for(const name of Object.keys(presets))select.add(new Option(name,name));
+}
+function applyRotationPreset(){
+  const name=$('rotationPresetList').value;
+  const d=JSON.parse(localStorage.getItem('cadview-rotations')||'{}')[name];
+  if(!d){toast('Vorlage auswählen.',true);return}
+  if(d.nodes.length!==allNodes.length){toast('Vorlage gehört zu einer anderen Bauteilstruktur.',true);return}
+  if(explodeFactor){$('explodeRange').value=0;updateExplode()}
+  writeTransform(modelRoot,d.root);
+  d.nodes.forEach((record,i)=>{writeTransform(allNodes[i].obj,record.transform);basePositions.set(allNodes[i].obj,allNodes[i].obj.position.clone())});
+  if(d.stepTransform?.length===16)stepGlobalTransform.fromArray(d.stepTransform);
+  stepExportCompatible=Boolean(d.stepCompatible);
+  modelRoot.updateWorldMatrix(true,true);refreshSelectionBox();updateDimensions();updateSection();fitToObject(modelRoot);
+  toast('Drehvorlage „'+name+'“ angewendet.');
+}
+function serialMaterial(m){return {name:m.name||'',color:'#'+m.color.getHexString(),metalness:m.metalness??0,roughness:m.roughness??1,opacity:m.opacity??1}}
+function projectData(){
+  return {schema:'cadview-studio-project',version:2,source:currentFilename,fileIdentity,unit:currentUnit,
+    root:readTransform(modelRoot),stepTransform:stepGlobalTransform.toArray(),stepCompatible:stepExportCompatible,
+    nodes:allNodes.map(n=>({id:n.id,name:n.obj.name,category:n.category,visible:n.obj.visible,transform:readTransform(n.obj),materials:getMeshes(n.obj).filter(mesh=>closestNodeFromObject(mesh)===n).map(mesh=>({name:mesh.name,materials:(Array.isArray(mesh.material)?mesh.material:[mesh.material]).map(serialMaterial)}))})),
+    lightTheme,measurements:savedMeasurements.map(m=>({a:m.a.toArray(),b:m.b.toArray(),label:m.label})),
+    section:{enabled:clipEnabled,axis:$('sectionAxis').value,value:$('sectionRange').value,invert:$('sectionInvert').checked,secondary:$('section2Toggle').checked,axis2:$('section2Axis').value,value2:$('section2Range').value,invert2:$('section2Invert').checked}};
+}
+function saveProject(downloadFile=false){
+  if(!modelRoot)return;
+  const state=projectData();
+  try{localStorage.setItem('cadview-project:'+fileIdentity,JSON.stringify(state));}
+  catch(err){toast('Lokaler Speicher ist voll; JSON wird trotzdem exportiert.');}
+  if(downloadFile)download(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),filenameStem()+'.cadview.json');
+  toast('Projektkonfiguration gespeichert'+(downloadFile?' und als JSON exportiert.':'.'));
+}
+function restoreSavedProjectIfPresent(){
+  const saved=localStorage.getItem('cadview-project:'+fileIdentity);
+  if(!saved)return;
+  try{applyProject(JSON.parse(saved),true);toast('Gespeicherte Ausrichtung und Materialien wiederhergestellt.')}
+  catch(err){console.warn('Projektwiederherstellung:',err)}
+}
+function applyProject(data,auto=false){
+  if(!data||data.schema!=='cadview-studio-project'||!Array.isArray(data.nodes))throw new Error('Keine CADVIEW-Projektdatei.');
+  if(data.nodes.length!==allNodes.length)throw new Error(`Bauteilstruktur passt nicht (${data.nodes.length} statt ${allNodes.length} Elemente). Bitte zuerst das zugehörige CAD-Modell laden.`);
+  if(!auto&&data.source!==currentFilename&&!confirm(`Die Konfiguration stammt von „${data.source}“. Trotzdem auf „${currentFilename}“ anwenden?`))return;
+  if(explodeFactor){$('explodeRange').value=0;updateExplode();}
+  writeTransform(modelRoot,data.root);
+  for(let i=0;i<data.nodes.length;i++){
+    const row=data.nodes[i],node=allNodes[i];
+    if(row.name!==node.obj.name)throw new Error('Projektteil-Namen stimmen nicht überein.');
+    node.category=row.category||'Sonstige';node.obj.userData.category=node.category;
+    node.obj.visible=row.visible!==false;
+    writeTransform(node.obj,row.transform);
+    basePositions.set(node.obj,node.obj.position.clone());
+    const meshes=getMeshes(node.obj).filter(mesh=>closestNodeFromObject(mesh)===node);
+    for(let j=0;j<meshes.length;j++){
+      const m=meshes[j],saved=row.materials?.[j]?.materials;
+      if(!saved)continue;
+      const mats=Array.isArray(m.material)?m.material:[m.material];
+      saved.forEach((v,k)=>{const mat=mats[k];if(!mat)return;mat.name=v.name;mat.color.set(v.color);mat.metalness=v.metalness;mat.roughness=v.roughness;mat.opacity=v.opacity;mat.transparent=v.opacity<1;mat.depthWrite=v.opacity>.96;mat.needsUpdate=true});
+    }
+  }
+  if(data.stepTransform?.length===16)stepGlobalTransform.fromArray(data.stepTransform);
+  stepExportCompatible=Boolean(data.stepCompatible);
+  clearSavedMeasurements();clearAutoDimensions();
+  for(const m of data.measurements||[])if(m.a?.length===3&&m.b?.length===3)addSavedMeasurement(new THREE.Vector3(...m.a),new THREE.Vector3(...m.b),m.label||'Abstand',false);
+  if(data.section){
+    const sec=data.section;clipEnabled=!!sec.enabled;
+    $('sectionAxis').value=sec.axis||'z';$('sectionRange').value=sec.value||0;$('sectionInvert').checked=!!sec.invert;
+    $('section2Toggle').checked=!!sec.secondary;$('section2Axis').value=sec.axis2||'x';$('section2Range').value=sec.value2||0;$('section2Invert').checked=!!sec.invert2;
+    $('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!sec.secondary;
+    $('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled));
+  }
+  modelRoot.updateWorldMatrix(true,true);modelRoot.traverse(applyFlagsToMesh);updateTree();selectNode(null);updateSection();fitToObject(modelRoot);refreshMeasurementDisplays();
+  if(data.lightTheme!==undefined)setLightTheme(data.lightTheme);
+}
+function materialDisplayName(mat){
+  const generic=mat.name&&mat.name!=='Material'?mat.name:null;
+  return generic||`Material ${'#'+mat.color.getHexString()}`;
+}
+function groupMeshesByMaterial(){
+  // Split a mesh into independent surfaces per material index; required for true GLB hierarchy.
+  modelRoot.updateWorldMatrix(true,true);
+  return getMeshes(modelRoot).filter(isActuallyVisible).flatMap(mesh=>{
+    const mats=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+    const groups=mesh.geometry.groups.length?mesh.geometry.groups:[{start:0,count:mesh.geometry.index?.count||mesh.geometry.getAttribute('position').count,materialIndex:0}];
+    const byIndex=new Map();
+    for(const g of groups){if(!g.count)continue;const mi=g.materialIndex||0;
+      if(!byIndex.has(mi))byIndex.set(mi,[]);byIndex.get(mi).push(g);
+    }
+    return [...byIndex].map(([materialIndex,ranges])=>{
+      const sourceMat=mats[materialIndex]||mats[0];
+      const srcIndex=mesh.geometry.index?.array;
+      const geom=mesh.geometry.clone();
+      if(srcIndex){
+        const combined=[];for(const range of ranges){for(let k=range.start;k<Math.min(srcIndex.length,range.start+range.count);k++)combined.push(srcIndex[k]);}
+        geom.setIndex(combined);
+      }else if(ranges.length===1)geom.setDrawRange(ranges[0].start,ranges[0].count);
+      geom.clearGroups();
+      const copy=new THREE.Mesh(geom,sourceMat.clone());
+      copy.name=mesh.name||'Teil';copy.matrix.copy(mesh.matrixWorld);copy.matrix.decompose(copy.position,copy.quaternion,copy.scale);
+      const node=closestNodeFromObject(mesh);
+      return {copy,category:node?.category||'Sonstige',material:materialDisplayName(sourceMat),part:node?.obj.name||mesh.name};
+    });
+  });
+}
+function groupedForExport(mode){
+  const result=new THREE.Group();result.name='CADVIEW Studio';
+  const cache=new Map();
+  const group=(parent,key)=>{
+    const id=parent.uuid+'::'+key;
+    if(!cache.has(id)){const g=new THREE.Group();g.name=key;parent.add(g);cache.set(id,g);}
+    return cache.get(id);
+  };
+  for(const m of groupMeshesByMaterial()){
+    let parent=result;
+    if(mode==='category'||mode==='category-material')parent=group(parent,m.category);
+    if(mode==='material'||mode==='category-material')parent=group(parent,m.material);
+    m.copy.name=m.part+' / '+m.material;
+    parent.add(m.copy);
+  }
+  return result;
+}
+function exportRotatedStep(){
+  if(!sourceStepText)throw new Error('STEP-Originalexport nur bei einer geladenen .stp/.step-Datei.');
+  if(!stepExportCompatible || !stepGlobalTransform.equals(new THREE.Matrix4())){
+    throw new Error('STEP nach Drehung ist noch nicht verfügbar: Exakter CAD-Export erfordert einen OpenCascade-WASM-Schreibkernel. Verwende GLB/STL/OBJ für die gedrehte Geometrie oder exportiere die ursprüngliche STEP-Datei vor der Drehung.');
+  }
+  download(new Blob([sourceStepText],{type:'application/step'}),filenameStem()+'-original.step');
+  toast('Original-STEP unverändert gespeichert (exakte CAD-Geometrie).');
+}
+
+function formatMeasured(raw){
+  let original=currentUnit==='mm'?'mm':currentUnit==='m'?'m':'Einheiten';
+  const choice=$('measureUnits').value;
+  if(choice==='original'||original==='Einheiten')return raw.toLocaleString('de-DE',{maximumFractionDigits:3})+' '+original;
+  const mm=original==='mm'?raw:raw*1000;
+  const unit=choice;
+  const value=unit==='mm'?mm:unit==='cm'?mm/10:unit==='m'?mm/1000:mm/25.4;
+  return value.toLocaleString('de-DE',{maximumFractionDigits:3})+' '+(unit==='inch'?'in':unit);
+}
+function createDimensionSprite(label){
+  const cv=document.createElement('canvas');cv.width=512;cv.height=128;
+  const c=cv.getContext('2d');c.fillStyle=lightTheme?'#ffffff':'#0d1c2d';c.strokeStyle='#49c6c2';c.lineWidth=4;
+  c.beginPath();c.roundRect(4,4,504,120,18);c.fill();c.stroke();
+  c.fillStyle=lightTheme?'#1b293a':'#e8ffff';c.font='bold 37px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText(label.slice(0,24),256,67);
+  const texture=new THREE.CanvasTexture(cv);texture.colorSpace=THREE.SRGBColorSpace;
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));
+  const size=Math.max(baseBounds().getSize(new THREE.Vector3()).length()*.095,2);
+  sprite.scale.set(size*3,size*.75,1);sprite.renderOrder=99;return sprite;
+}
+function makeMeasureGraphic(a,b,label){
+  const g=new THREE.Group();g.name='Bemaßung · '+label;
+  const col=0x32d2cb;
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:col,depthTest:false}));line.renderOrder=80;g.add(line);
+  const radius=Math.max(baseBounds().getSize(new THREE.Vector3()).length()*.0028,.18);
+  for(const p of [a,b]){
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(radius,10,8),new THREE.MeshBasicMaterial({color:col,depthTest:false}));dot.position.copy(p);dot.renderOrder=81;g.add(dot);
+  }
+  const labelSprite=createDimensionSprite(label);labelSprite.position.copy(a).add(b).multiplyScalar(.5);g.add(labelSprite);
+  scene.add(g);return g;
+}
+function disposeDimensionGroup(g){
+  scene.remove(g);g.traverse(o=>{o.geometry?.dispose();const arr=Array.isArray(o.material)?o.material:[o.material];for(const m of arr)if(m){m.map?.dispose();m.dispose?.()}});
+}
+function addSavedMeasurement(a,b,label='Abstand',refresh=true){
+  const entry={a:a.clone(),b:b.clone(),label,graphic:null};
+  entry.graphic=makeMeasureGraphic(a,b,formatMeasured(a.distanceTo(b)));
+  savedMeasurements.push(entry);
+  if(refresh)refreshMeasurementDisplays();
+}
+function clearSavedMeasurements(){savedMeasurements.splice(0).forEach(m=>disposeDimensionGroup(m.graphic));refreshMeasurementDisplays()}
+function clearAutoDimensions(){dimensionGraphics.forEach(disposeDimensionGroup);dimensionGraphics=[]}
+function refreshMeasurementDisplays(){
+  for(const m of savedMeasurements){disposeDimensionGroup(m.graphic);m.graphic=makeMeasureGraphic(m.a,m.b,formatMeasured(m.a.distanceTo(m.b)))}
+  const list=$('measurementList');list.replaceChildren();
+  if(!savedMeasurements.length){const p=document.createElement('p');p.className='dimension-note';p.textContent='Noch keine Punktmessungen. Im 3D-Modell zwei Punkte anklicken.';list.append(p)}
+  savedMeasurements.forEach((m,i)=>{
+    const row=document.createElement('div');row.className='measurement-entry';
+    const label=document.createElement('span');label.textContent=`${i+1}. ${m.label}: ${formatMeasured(m.a.distanceTo(m.b))}`;
+    const button=document.createElement('button');button.textContent='×';button.title='Messung löschen';button.addEventListener('click',()=>{disposeDimensionGroup(m.graphic);savedMeasurements.splice(i,1);refreshMeasurementDisplays()});
+    row.append(label,button);list.append(row);
+  });
+}
+function addAutoDimensions(){
+  clearAutoDimensions();const b=selectionBounds();if(b.isEmpty())return toast('Keine sichtbare Geometrie zum Bemaßen.',true);
+  const s=b.getSize(new THREE.Vector3());const offset=Math.max(s.length()*.04,.3);
+  const data=[
+    [new THREE.Vector3(b.min.x,b.min.y-offset,b.min.z-offset),new THREE.Vector3(b.max.x,b.min.y-offset,b.min.z-offset),'X'],
+    [new THREE.Vector3(b.max.x+offset,b.min.y,b.min.z-offset),new THREE.Vector3(b.max.x+offset,b.max.y,b.min.z-offset),'Y'],
+    [new THREE.Vector3(b.max.x+offset,b.max.y+offset,b.min.z),new THREE.Vector3(b.max.x+offset,b.max.y+offset,b.max.z),'Z']
+  ];
+  for(const [a,c,axis] of data)dimensionGraphics.push(makeMeasureGraphic(a,c,axis+' = '+formatMeasured(a.distanceTo(c))));
+  toast('Breite (X), Tiefe (Y) und Höhe (Z) als Bemaßung eingeblendet.');
+}
+function snapMeasurePoint(hit,event){
+  const mode=$('measureSnap').value;
+  if(mode==='surface'||!hit.face)return hit.point.clone();
+  const position=hit.object.geometry.getAttribute('position');
+  const vertices=[hit.face.a,hit.face.b,hit.face.c].map(i=>hit.object.localToWorld(new THREE.Vector3().fromBufferAttribute(position,i)));
+  const xy=p=>{const v=p.clone().project(camera),rect=canvas.getBoundingClientRect();return {x:rect.left+(v.x+1)/2*rect.width,y:rect.top+(1-v.y)/2*rect.height}};
+  const mouse={x:event.clientX,y:event.clientY};
+  let best=hit.point.clone(),bestDist=15;
+  if(mode==='vertex')for(const v of vertices){const s=xy(v),d=Math.hypot(s.x-mouse.x,s.y-mouse.y);if(d<bestDist){best=v;bestDist=d}}
+  if(mode==='edge')for(const [a,b] of [[vertices[0],vertices[1]],[vertices[1],vertices[2]],[vertices[2],vertices[0]]]){
+    const pa=xy(a),pb=xy(b),dx=pb.x-pa.x,dy=pb.y;
+    const t=Math.max(0,Math.min(1,((mouse.x-pa.x)*dx+(mouse.y-pa.y)*dy)/Math.max(dx*dx+dy*dy,1e-12)));
+    const sx=pa.x+t*dx,sy=pa.y+t*dy,d=Math.hypot(sx-mouse.x,sy-mouse.y);
+    if(d<bestDist){best=a.clone().lerp(b,t);bestDist=d}
+  }
+  return best;
+}
+function setLightTheme(light){
+  lightTheme=Boolean(light);lightBackground=lightTheme;
+  document.documentElement.dataset.theme=lightTheme?'light':'dark';
+  $('lightBackgroundToggle').checked=lightTheme;
+  $('themeButton').textContent=lightTheme?'☾ Dunkel':'☀ Hell';
+  $('appThemeColor').content=lightTheme?'#f5f8fb':'#0b121e';
+  scene.background=lightTheme?lightColor:darkColor;
+  grid.material.opacity=lightTheme?.3:1;
+  getMeshes(modelRoot).forEach(m=>{if(edgesByMesh.has(m))edgesByMesh.get(m).material.color.set(lightTheme?'#294658':'#8dabb7')});
+  localStorage.setItem('cadview-theme',lightTheme?'light':'dark');
+}
+async function setStudio(enabled){
+  $('studioToggle').checked=!!enabled;$('renderButton').classList.toggle('active',!!enabled);
+  try{
+    if(enabled&&!studioEnvironment){
+      const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
+      const pmrem=new THREE.PMREMGenerator(renderer);const room=new RoomEnvironment();
+      studioEnvironment=pmrem.fromScene(room).texture;room.dispose();pmrem.dispose();
+    }
+    scene.environment=enabled?studioEnvironment:null;
+    renderer.toneMappingExposure=enabled?1.3:1.36;
+    toast(enabled?'Studio-Rendering aktiv: Reflexionen und Materiallicht.':'Technische Materialansicht aktiv.');
+  }catch(err){$('studioToggle').checked=false;toast('Studio-Umgebung konnte nicht geladen werden: '+err.message,true)}
+}
+function screenshotHighRes(){
+  const rect=viewport.getBoundingClientRect();const old=renderer.getPixelRatio();
+  const ratio=Math.min(Math.max(old*2,2),Math.min(4096/rect.width,4096/rect.height));
+  if(!Number.isFinite(ratio)||ratio<=0)return;
+  try{
+    renderer.setPixelRatio(ratio);renderer.setSize(rect.width,rect.height,false);renderer.render(scene,camera);
+    canvas.toBlob(blob=>{
+      renderer.setPixelRatio(old);resize();
+      if(blob)download(blob,filenameStem()+'-render.png');else toast('Bildexport fehlgeschlagen.',true);
+    },'image/png');
+    toast(`Renderbild ${Math.round(rect.width*ratio)} × ${Math.round(rect.height*ratio)} Pixel.`);
+  }catch(err){renderer.setPixelRatio(old);resize();toast('Bildexport: '+err.message,true)}
+}
+function initializePWA(){
+  if('serviceWorker' in navigator&&location.protocol==='https:'){
+    navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Offline-Service-Worker:',e));
+  }
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('installButton').title='Als Desktop- oder Mobil-App installieren'});
+  window.addEventListener('appinstalled',()=>{deferredInstall=null;$('installButton').textContent='✓ Installiert';toast('CADVIEW Studio wurde installiert.')});
+  if(window.matchMedia('(display-mode: standalone)').matches)$('installButton').textContent='✓ App';
+}
+async function promptInstallation(){
+  if(deferredInstall){const event=deferredInstall;deferredInstall=null;event.prompt();await event.userChoice;return}
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  toast(isIOS?'Auf iOS: Teilen → Zum Home-Bildschirm.':'In Edge/Chrome: Menü → Apps → Diese Website als App installieren.');
+}
 // UI wiring
 $('openButton').addEventListener('click',openFileDialog);
 $('emptyOpen').addEventListener('click',openFileDialog);
@@ -626,17 +1015,19 @@ document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click'
 $('gridButton').addEventListener('click',()=>{const next=!grid.visible;grid.visible=next;axes.visible=next;$('gridButton').classList.toggle('active',next);$('gridButton').setAttribute('aria-pressed',String(next))});
 $('wireframeButton').addEventListener('click',()=>{edgesEnabled=!edgesEnabled;showEdges(edgesEnabled);$('wireframeButton').classList.toggle('active',edgesEnabled);$('wireframeButton').setAttribute('aria-pressed',String(edgesEnabled))});
 $('measureButton').addEventListener('click',()=>{measuring=!measuring;clearMeasure();canvas.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast('Messmodus: zwei Punkte auf dem Modell anklicken.')});
-$('sectionButton').addEventListener('click',()=>{clipEnabled=!clipEnabled;$('sectionRange').disabled=!clipEnabled;modelRoot?.traverse(applyFlagsToMesh);updateSection();$('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled))});
-$('sectionRange').addEventListener('input',()=>{$('sectionValue').textContent=$('sectionRange').value+' %';updateSection()});
+$('sectionButton').addEventListener('click',()=>{clipEnabled=!clipEnabled;$('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection();$('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled))});
+$('sectionRange').addEventListener('input',updateSection);
+for(const id of ['sectionAxis','sectionInvert','sectionNx','sectionNy','sectionNz','section2Axis','section2Range','section2Invert']) $(id).addEventListener('input',updateSection);
+$('section2Toggle').addEventListener('change',()=>{ $('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection() });
 $('explodeRange').addEventListener('input',updateExplode);
 $('xrayToggle').addEventListener('change',()=>modelRoot?.traverse(applyFlagsToMesh));
-$('lightBackgroundToggle').addEventListener('change',e=>{lightBackground=e.target.checked;scene.background=lightBackground?lightColor:darkColor;grid.material.opacity=lightBackground?.3:1;getMeshes(modelRoot).forEach(m=>{if(edgesByMesh.has(m))edgesByMesh.get(m).material.color.set(lightBackground?'#294658':'#8dabb7')})});
+$('lightBackgroundToggle').addEventListener('change',e=>setLightTheme(e.target.checked));
 $('materialPreset').addEventListener('change',e=>{
   const name=e.target.value;
   if(name==='original'){restoreMaterials();return}
   if(name==='custom')return;
   const p=presets[name];if(!p)return;
-  applyMaterialPatch(p);
+  applyMaterialPatch({...p,materialName:$('materialPreset')?.selectedOptions?.[0]?.textContent||name});
   $('materialColor').value=p.color;$('metalnessRange').value=p.metalness*100;$('roughnessRange').value=p.roughness*100;$('opacityRange').value=p.opacity*100;updateMaterialReadouts();
 });
 $('materialColor').addEventListener('input',e=>{applyMaterialPatch({color:e.target.value});$('materialPreset').value='custom'});
@@ -662,4 +1053,26 @@ window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(
   if(e.key.toLowerCase()==='f')fitToObject(selected?.obj||modelRoot);
 });
 
+$('applyCategoryButton').addEventListener('click',applyCategory);
+for(const id of ['rotatePositive','rotateNegative','rotate180'])$(id).addEventListener('click',()=>{
+  const d=id==='rotate180'?180:Number($('rotationAngle').value)*(id==='rotateNegative'?-1:1);
+  rotateActive($('rotationAxis').value,d);
+});
+$('saveRotationPreset').addEventListener('click',saveRotationPreset);
+$('applyRotationPreset').addEventListener('click',applyRotationPreset);
+$('saveProjectButton').addEventListener('click',()=>saveProject(true));
+$('loadProjectButton').addEventListener('click',()=>$('projectInput').click());
+$('projectInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{applyProject(JSON.parse(await file.text()));toast('Projektkonfiguration geladen.')}catch(err){toast('Projektdatei: '+err.message,true)}finally{e.target.value=''}});
+$('themeButton').addEventListener('click',()=>setLightTheme(!lightTheme));
+$('renderButton').addEventListener('click',()=>{ $('studioToggle').checked=!$('studioToggle').checked;setStudio($('studioToggle').checked) });
+$('studioToggle').addEventListener('change',e=>setStudio(e.target.checked));
+$('highResScreenshot').addEventListener('click',screenshotHighRes);
+$('dimensionButton').addEventListener('click',addAutoDimensions);
+$('measureBoundsButton').addEventListener('click',addAutoDimensions);
+$('clearAllMeasurements').addEventListener('click',()=>{clearSavedMeasurements();clearAutoDimensions();toast('Alle Bemaßungen entfernt.')});
+$('measureUnits').addEventListener('change',refreshMeasurementDisplays);
+$('installButton').addEventListener('click',promptInstallation);
+initializePWA();
+loadRotationPresets();
+setLightTheme(localStorage.getItem('cadview-theme')==='light');
 createDemo();resize();animate();
