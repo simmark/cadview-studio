@@ -156,3 +156,14 @@ Die PWA verwendet weiterhin die eindeutige App-ID `/cadview-studio/` und bleibt 
 ### Einschränkung und Testhinweise
 
 Die Änderungen wurden auf Syntax, Dateikonsistenz, HTML-IDs und CSS geprüft. Ein vollständiger echter WebGL-Browsertest war in der vorhandenen Testumgebung nicht möglich. Daher erst Demo prüfen, dann die reale STEP-Datei erneut laden und ggf. das sichtbare Fehlerprotokoll beziehungsweise die Browserkonsole beobachten. Der STEP-Export bleibt unverändert ein Download des Original-CAD, keine neu berechnete B-Rep-Geometrie.
+## Beta 1.4.1 – Kameraeingabe und Bauteildrehung
+
+Die WebGL-Zeichenfläche verarbeitet keine Maus- oder Touch-Events mehr. Eine separate Eingabefläche `#cadInteractionLayer` erhält alle Pointer-Ereignisse und steuert `OrbitControls`, die Bauteilauswahl und die magnetische Messpunkt-Auswahl. Damit sind WebGL-Rendering und Interaktion voneinander unabhängig.
+
+**Kamera:** Linke Maustaste im 3D-Bereich gedrückt halten und ziehen (Orbit), rechte Maustaste ziehen (Verschieben), Mausrad (Zoom). Zusätzlich gibt es vier Schaltflächen für Kameradrehung und -neigung. Das ändert weder die Geometrie noch den Mesh-Export.
+
+**Bauteil:** In der Struktur oder im 3D-Modell markieren und `↻ Teil 90°` drücken; alternativ im Tab **Ausrichten** einen beliebigen Winkel und eine Achse wählen. Ohne Bauteilauswahl dreht die Funktion die gesamte Baugruppe. Diese Änderung wird in GLB/STL/OBJ berücksichtigt, aber ist kein vollwertiger B-Rep-STEP-Schreibvorgang.
+
+Eine kleine Anzeige im Viewport zeigt an, ob Zeigereingaben eintreffen. Für die installierte Edge-PWA sind die CSS- und JS-Dateien auf Version `1.4.1` umgestellt und der CADVIEW-eigene Service-Worker-Cache wird erneuert. Die PWA-ID bleibt `/cadview-studio/`; der S-Parameter Analyzer wird nicht verändert.
+
+**Test:** Demo öffnen, mit linker Maustaste über der Baugruppe ziehen, Mausrad zoomen, rechte Maustaste ziehen; ein Bauteil im Baum auswählen und `↻ Teil 90°` klicken; danach dieselben Funktionen mit einer importierten STEP-Datei prüfen.
