@@ -180,3 +180,18 @@ Die früheren Versionen stützten sich für die Mausbewegung allein auf die an d
 **Regression:** Verifizieren: Demo laden → im Kameramodus linke Maustaste ziehen → Rad-Zoom → Bauteilmodus einschalten → Modell im 3D-Feld ziehen → Bauteil im linken Baum auswählen → erneut ziehen. Danach mit einer STEP-Datei wiederholen. Die JS-Syntax und die Veröffentlichung wurden technisch geprüft; ein vollständiger reproduzierter Test im Edge-PWA-Fenster steht noch aus.
 
 PWA-ID und Scope bleiben `/cadview-studio/`. Der S-Parameter Analyzer wird nicht verändert. Bei alter Version Edge-Web-App schließen, normale Website mit `Strg+F5` aktualisieren und anschließend die App neu starten.
+
+## Beta 1.4.3 – Renderloop: Ursache von nicht reagierender 3D-Kamera
+
+**Benutzerdia­gnose aus Edge PWA 1.4.2:** `pointerEvents: "auto"`, `moves: 358`, `orbits: 298`, `zooms: 16`, aber `renderFrames: 0`. Der Mauscontroller nahm Eingaben an und die Kamerakoordinaten änderten sich. Es fehlte jedoch eine laufende 3D-Bildaktualisierung. Deshalb waren auch die festen Ansichten und Bauteildrehungen scheinbar wirkungslos. Nach Minimieren/Wiederherstellen konnte die nicht neu gezeichnete Canvas-Fläche weiß bleiben.
+
+- **Startreihenfolge repariert:** Die 3D-Render-Schleife startet nun vor `createDemo()`, sodass Modellinitialisierungsfehler die Animation nicht mehr dauerhaft verhindern.
+- **Direktes Redraw:** Maus-Orbit, Panning, Zoom, Kamerarichtung, Modellrotation, Materialänderung, Modellimport und Ansicht zurücksetzen zeichnen ausdrücklich neu. Die regelmäßige `requestAnimationFrame`-Schleife bleibt zusätzlich aktiv.
+- **WebGL-Kontext:** `webglcontextlost` / `webglcontextrestored` sind jetzt am WebGL-`canvas` registriert, nicht an der transparenten Eingabeebene.
+- **Fensterwiederherstellung:** `pageshow`, `focus`, `resize` und `visibilitychange` aktualisieren Canvas-Größe und zeichnen erneut.
+- **Diagnose 1.4.3:** Enthält Loop-Status, erfolgreich gerenderte Bilder, letzten Render- und Startfehler, Kontextstatus, GPU-Dreieck- und Drawcall-Zähler und Kamera/Target; keine CAD-Datei oder Bauteilnamen.
+- **Hilfe:** Die Hilfe oben rechts erscheint nur als `?` mit zugänglichem Label und Tooltip.
+
+**Test in Edge:** Installation vollständig schließen → Website neu laden → Versionsbadge **BETA 1.4.3** prüfen → Demo bewegen, 3D / Oben / Links wechseln, einzelnes Teil rotieren, STEP öffnen, erneut bewegen → App minimieren/wiederherstellen → Diagnose öffnen. `renderFrames` muss dann über 0 liegen und ansteigen. Wenn es 0 bleibt, bitte die vollständige Diagnose sowie den Konsolenfehler senden.
+
+Die Korrektur ist im Repository überprüft; der vollständige GPU-/PWA-Livetest muss auf dem Zielgerät bestätigt werden.
