@@ -727,7 +727,7 @@ function clonedForExport(){
 }
 async function exportModel(format){
   if(!modelRoot||!getMeshes(modelRoot).some(isActuallyVisible)){toast('Keine sichtbaren Bauteile zum Exportieren vorhanden.',true);return}
-  $('exportMenu').classList.add('hidden');
+  closeExportMenu();
   setLoading(true,`Export als ${format.toUpperCase()} …`,'Sichtbare Bauteile und aktuelle Materialeinstellungen werden berücksichtigt.');
   try{
     if(format==='step'){exportRotatedStep();return;}
@@ -1689,9 +1689,43 @@ for(const field of ['metalness','roughness','opacity']){
 }
 $('resetMaterialButton').addEventListener('click',restoreMaterials);
 $('screenshotButton').addEventListener('click',screenshot);
-$('exportButton').addEventListener('click',e=>{e.stopPropagation();const m=$('exportMenu');m.classList.toggle('hidden');$('exportButton').setAttribute('aria-expanded',String(!m.classList.contains('hidden')))});
+const exportMenu=$('exportMenu');
+const exportButton=$('exportButton');
+// Portal into document.body: parent header z-index must never clip/overlap this popover.
+function placeExportMenu(){
+  if(exportMenu.classList.contains('hidden'))return;
+  const anchor=exportButton.getBoundingClientRect();
+  const margin=10,viewportWidth=window.innerWidth,viewportHeight=window.innerHeight;
+  const width=Math.min(320,viewportWidth-2*margin);
+  exportMenu.style.width=width+'px';
+  const height=Math.min(exportMenu.scrollHeight,viewportHeight-2*margin);
+  let left=Math.max(margin,Math.min(anchor.right-width,viewportWidth-width-margin));
+  let top=anchor.bottom+8;
+  if(top+height>viewportHeight-margin && anchor.top-height-8>=margin)top=anchor.top-height-8;
+  top=Math.max(margin,Math.min(top,viewportHeight-height-margin));
+  exportMenu.style.left=Math.round(left)+'px';
+  exportMenu.style.top=Math.round(top)+'px';
+}
+function closeExportMenu(){
+  exportMenu.classList.add('hidden');
+  exportButton.setAttribute('aria-expanded','false');
+}
+exportButton.addEventListener('click',event=>{
+  event.stopPropagation();
+  const opening=exportMenu.classList.contains('hidden');
+  if(opening){
+    if(exportMenu.parentElement!==document.body)document.body.appendChild(exportMenu);
+    exportMenu.classList.remove('hidden');placeExportMenu();
+  }else closeExportMenu();
+  exportButton.setAttribute('aria-expanded',String(opening));
+});
 document.querySelectorAll('[data-export]').forEach(b=>b.addEventListener('click',()=>exportModel(b.dataset.export)));
-document.addEventListener('click',e=>{if(!e.target.closest('.dropdown-anchor')){$('exportMenu').classList.add('hidden');$('exportButton').setAttribute('aria-expanded','false')}});
+document.addEventListener('pointerdown',e=>{
+  if(!exportMenu.classList.contains('hidden')&&!exportMenu.contains(e.target)&&!exportButton.contains(e.target))closeExportMenu();
+});
+window.addEventListener('resize',placeExportMenu);
+window.addEventListener('scroll',placeExportMenu,true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeExportMenu()});
 function closeMobilePanels(){$('leftSidebar').classList.remove('open');$('rightSidebar').classList.remove('open')}
 $('mobileTree').addEventListener('click',()=>{$('leftSidebar').classList.toggle('open');$('rightSidebar').classList.remove('open')});
 $('mobileProperties').addEventListener('click',()=>{$('rightSidebar').classList.toggle('open');$('leftSidebar').classList.remove('open')});
