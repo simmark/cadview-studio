@@ -27,7 +27,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.36;
 renderer.localClippingEnabled = true;
 const controls = new OrbitControls(camera, interactionSurface);
-controls.enableDamping = true;
+// Disable OrbitControls DOM input; one deterministic pointer driver owns orbit/pan/dolly.
+controls.enabled = false;
+controls.enableDamping = false;
 controls.dampingFactor = 0.085;
 controls.minDistance = 0.01;
 controls.maxDistance = 1e9;
@@ -833,7 +835,7 @@ function applyCategory(){
   affected.forEach(n=>{n.category=value;n.obj.userData.category=value});
   updateTree();toast(`${affected.size} Komponenten zu „${value}“ zugeordnet.`);
 }
-function rotateActive(axis,angle){
+function rotateActive(axis,angle,silent=false){
   if(!modelRoot||!Number.isFinite(angle)||Math.abs(angle)>3600){toast('Ungültiger Drehwinkel.',true);return}
   if(!angle)return;
   if(explodeFactor){$('explodeRange').value=0;updateExplode();}
@@ -855,7 +857,7 @@ function rotateActive(axis,angle){
   else stepGlobalTransform.premultiply(worldTransform);
   modelRoot.updateWorldMatrix(true,true);
   refreshSelectionBox();updateDimensions();updateSection();repositionGrid();
-  toast(`Rotation ${angle}° um ${axis.toUpperCase()} angewendet – Export berücksichtigt neue Ausrichtung.`);
+  if(!silent)toast(`Rotation ${angle}° um ${axis.toUpperCase()} angewendet – Export berücksichtigt neue Ausrichtung.`);
 }
 function nHasAncestor(n,possibleParent){for(let p=n.parent;p;p=p.parent)if(p===possibleParent)return true;return false}
 function readTransform(o){return {position:o.position.toArray(),quaternion:o.quaternion.toArray(),scale:o.scale.toArray()}}
@@ -1444,6 +1446,126 @@ function setupHelpAndLocalization(){
 }
 
 // UI wiring
+
+// CADVIEW 1.4.2: independent pointer controller. Do not rely on OrbitControls' browser listeners.
+// The OrbitControls instance still owns the camera target used by fitting and view presets.
+let manipulationMode = 'camera';
+let activeDrag = null;
+const pointerDiagnostics = {down:0,moves:0,orbits:0,pans:0,zooms:0,rotations:0};
+const feedbackText = msg => {if($('inputFeedback'))$('inputFeedback').textContent=msg;};
+function cameraOrbitPixels(dx,dy){
+  const height=Math.max(240,interactionSurface.clientHeight);
+  const offset=camera.position.clone().sub(controls.target);
+  if(offset.lengthSq()<1e-10)return;
+  const speed=Math.PI*1.6/height;
+  camera.updateMatrixWorld(true);
+  const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0).normalize();
+  offset.applyAxisAngle(new THREE.Vector3(0,0,1),-dx*speed);
+  const tilted=offset.clone().applyAxisAngle(right,-dy*speed);
+  if(Math.abs(tilted.clone().normalize().z)<.985)offset.copy(tilted);
+  camera.up.set(0,0,1);
+  camera.position.copy(controls.target).add(offset);
+  camera.lookAt(controls.target);controls.update();
+  pointerDiagnostics.orbits++;
+}
+function cameraPanPixels(dx,dy){
+  camera.updateMatrixWorld(true);
+  const height=Math.max(240,interactionSurface.clientHeight);
+  const dist=Math.max(camera.position.distanceTo(controls.target),.001);
+  const factor=2*dist*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/height;
+  const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);
+  const up=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
+  const move=right.multiplyScalar(-dx*factor).add(up.multiplyScalar(dy*factor));
+  camera.position.add(move);controls.target.add(move);controls.update();
+  pointerDiagnostics.pans++;
+}
+function cameraZoomDelta(dy){
+  if(!modelRoot)return;
+  const offset=camera.position.clone().sub(controls.target);
+  const distance=offset.length();
+  const zoomed=THREE.MathUtils.clamp(distance*Math.exp(dy*.0014),controls.minDistance,controls.maxDistance);
+  if(distance<1e-8)return;
+  camera.position.copy(controls.target).addScaledVector(offset,zoomed/distance);
+  controls.update();pointerDiagnostics.zooms++;
+}
+function syncInteractionMode(){
+  const button=$('interactionModeToggle');if(!button)return;
+  const isModel=manipulationMode==='model';
+  button.classList.toggle('active',isModel);
+  button.setAttribute('aria-pressed',String(isModel));
+  button.textContent=isModel?
+    (language()==='en'?'Edit: drag part':'Bauteil per Maus drehen'):
+    (language()==='en'?'Camera: drag view':'Kamera mit Maus drehen');
+  feedbackText(isModel?
+    (language()==='en'?'DRAG ROTATES THE SELECTED PART':'Ziehen dreht das ausgewählte Bauteil'):
+    (language()==='en'?'DRAG ORBITS THE CAMERA':'Ziehen dreht die Kamera'));
+}
+$('interactionModeToggle')?.addEventListener('click',()=>{
+  manipulationMode=manipulationMode==='camera'?'model':'camera';
+  syncInteractionMode();
+});
+interactionSurface.addEventListener('contextmenu',e=>e.preventDefault());
+interactionSurface.addEventListener('pointerdown',e=>{
+  if(e.button!==0&&e.button!==1&&e.button!==2)return;
+  activeDrag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,button:e.button,
+    pan:e.button!==0||e.shiftKey,mode:manipulationMode,moved:0};
+  pointerDiagnostics.down++;
+  interactionSurface.classList.add('is-dragging');
+  try{interactionSurface.setPointerCapture(e.pointerId)}catch{}
+  feedbackText(language()==='en'?'Pointer OK · move mouse':'Maus erkannt · jetzt ziehen');
+});
+window.addEventListener('pointermove',e=>{
+  const d=activeDrag;
+  if(!d||e.pointerId!==d.pointerId)return;
+  const dx=e.clientX-d.x,dy=e.clientY-d.y;
+  if(!dx&&!dy)return;
+  d.x=e.clientX;d.y=e.clientY;
+  d.moved+=Math.hypot(dx,dy);
+  pointerDiagnostics.moves++;
+  if(d.mode==='model'&&d.button===0&&!d.pan&&!measuring){
+    // Incremental rotations preserve the complete assembly and each selected component's mesh.
+    if(Math.abs(dx)>0.01)rotateActive('z',-dx*.42,true);
+    if(Math.abs(dy)>0.01)rotateActive('x',-dy*.42,true);
+    pointerDiagnostics.rotations++;
+    feedbackText((language()==='en'?'Part rotated':'Bauteil gedreht')+' · '+pointerDiagnostics.rotations);
+  } else if(d.pan){
+    cameraPanPixels(dx,dy);
+    feedbackText((language()==='en'?'Camera pan':'Kamera verschieben')+' · '+pointerDiagnostics.pans);
+  } else if(!measuring){
+    cameraOrbitPixels(dx,dy);
+    feedbackText((language()==='en'?'Camera rotated':'Kamera gedreht')+' · '+pointerDiagnostics.orbits);
+  }
+  if(d.moved>4)e.preventDefault();
+},{passive:false});
+const endManualDrag=e=>{
+  if(!activeDrag||activeDrag.pointerId!==e.pointerId)return;
+  activeDrag=null;
+  interactionSurface.classList.remove('is-dragging');
+  try{interactionSurface.releasePointerCapture(e.pointerId)}catch{}
+};
+window.addEventListener('pointerup',endManualDrag);
+window.addEventListener('pointercancel',endManualDrag);
+window.addEventListener('blur',()=>{activeDrag=null;interactionSurface.classList.remove('is-dragging')});
+interactionSurface.addEventListener('wheel',e=>{
+  if(!modelRoot)return;
+  e.preventDefault();
+  cameraZoomDelta(e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?interactionSurface.clientHeight:1));
+  feedbackText((language()==='en'?'Zoom OK':'Zoom erkannt')+' · '+pointerDiagnostics.zooms);
+},{passive:false});
+$('inputDiagnosticsButton')?.addEventListener('click',async()=>{
+  const rect=interactionSurface.getBoundingClientRect();
+  const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+  const report={version:'1.4.2',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
+    size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
+    mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,
+    camera:camera.position.toArray().map(v=>Number(v.toFixed(3))),
+    target:controls.target.toArray().map(v=>Number(v.toFixed(3)))};
+  const textReport=JSON.stringify(report,null,2);
+  try{await navigator.clipboard.writeText(textReport);toast(language()==='en'?'Diagnostics copied; paste into chat.':'Diagnose kopiert – hier im Chat einfügen.')}
+  catch{window.prompt('CADVIEW Diagnose – kopieren',textReport)}
+});
+syncInteractionMode();
+
 $('openButton').addEventListener('click',openFileDialog);
 $('emptyOpen').addEventListener('click',openFileDialog);
 $('mobileOpen').addEventListener('click',openFileDialog);
