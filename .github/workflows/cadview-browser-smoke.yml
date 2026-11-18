@@ -1,7 +1,18 @@
-name: CADVIEW browser WebGL smoke test (manual)
+name: CADVIEW browser WebGL smoke test
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - app.js
+      - index.html
+      - rework.css
+      - enhancements.css
+      - gui.js
+      - sw.js
+      - tests/browser-smoke.mjs
+      - .github/workflows/cadview-browser-smoke.yml
 
 jobs:
   browser-smoke:
