@@ -606,21 +606,26 @@ function clearMeasure(){
   measureMarkers=[];
   if(measureLine){scene.remove(measureLine);measureLine.geometry.dispose();measureLine.material.dispose();measureLine=null}
   $('measureLabel').classList.add('hidden');
+  renderNow('measurement preview cleared');
 }
 function addMeasurePoint(pos){
   measurePoints.push(pos.clone());
   const marker=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:'#22c6bd',depthTest:false,depthWrite:false}));
-  marker.userData.pixelRadius=3.5;marker.position.copy(pos);marker.renderOrder=92;scene.add(marker);measureMarkers.push(marker);
+  marker.userData.pixelRadius=2.4;marker.position.copy(pos);
+  marker.scale.setScalar(worldPerPixel(pos)*marker.userData.pixelRadius);
+  marker.renderOrder=92;scene.add(marker);measureMarkers.push(marker);
   if(measurePoints.length===2){
     const a=measurePoints[0].clone(),b=measurePoints[1].clone();
     const dist=a.distanceTo(b);
     addSavedMeasurement(a,b);
     clearMeasure();
+    renderNow('measurement saved');
     toast(`${translateDynamic('Distance saved')}: ${formatMeasured(dist)}`);
   }else{
     $('measureLabel').textContent=translateDynamic('Select second point');
     $('measureLabel').classList.remove('hidden');
   }
+  renderNow('measurement point added');
 }
 function screenIntersections(evt){
   const rect=canvas.getBoundingClientRect();
@@ -1082,8 +1087,8 @@ function createDimensionSprite(label){
   c.textAlign='center';c.textBaseline='middle';c.fillText(label.slice(0,30),256,53);
   const texture=new THREE.CanvasTexture(cv);texture.colorSpace=THREE.SRGBColorSpace;
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));
-  sprite.userData.pixelWidth=Math.min(144,Math.max(90,label.length*6.4+22));
-  sprite.userData.pixelHeight=23;
+  sprite.userData.pixelWidth=Math.min(132,Math.max(78,label.length*5.8+18));
+  sprite.userData.pixelHeight=18;
   sprite.renderOrder=103;return sprite;
 }
 function makeMeasureGraphic(a,b,label){
@@ -1093,10 +1098,18 @@ function makeMeasureGraphic(a,b,label){
   line.renderOrder=86;g.add(line);
   for(const pt of [a,b]){
     const dot=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:col,depthTest:false,depthWrite:false}));
-    dot.position.copy(pt);dot.userData.pixelRadius=3;dot.renderOrder=102;g.add(dot);
+    dot.position.copy(pt);dot.userData.pixelRadius=2.25;
+    dot.scale.setScalar(worldPerPixel(pt)*dot.userData.pixelRadius);
+    dot.renderOrder=102;g.add(dot);
   }
   const sprite=createDimensionSprite(label);
   sprite.position.copy(a).add(b).multiplyScalar(.5);
+  sprite.userData.anchor=sprite.position.clone();
+  sprite.userData.pixelOffset=12;
+  const pp=worldPerPixel(sprite.position);
+  sprite.scale.set(sprite.userData.pixelWidth*pp,sprite.userData.pixelHeight*pp,1);
+  camera.updateMatrixWorld(true);
+  sprite.position.addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize(),pp*12);
   g.add(sprite);g.visible=measurementsVisible;scene.add(g);return g;
 }
 function disposeDimensionGroup(g){
@@ -1104,13 +1117,15 @@ function disposeDimensionGroup(g){
   scene.remove(g);g.traverse(o=>{o.geometry?.dispose();const arr=Array.isArray(o.material)?o.material:[o.material];for(const m of arr)if(m){m.map?.dispose();m.dispose?.()}});
 }
 function addSavedMeasurement(a,b,label='Abstand',refresh=true){
+  measurementsVisible=true;
   const entry={a:a.clone(),b:b.clone(),label,graphic:null};
   entry.graphic=makeMeasureGraphic(a,b,formatMeasured(a.distanceTo(b)));
   savedMeasurements.push(entry);
   if(refresh)refreshMeasurementDisplays();
+  renderNow('saved measurement');
 }
-function clearSavedMeasurements(){savedMeasurements.splice(0).forEach(m=>disposeDimensionGroup(m.graphic));refreshMeasurementDisplays()}
-function clearAutoDimensions(){dimensionGraphics.forEach(disposeDimensionGroup);dimensionGraphics=[];setDimensionControls()}
+function clearSavedMeasurements(){savedMeasurements.splice(0).forEach(m=>disposeDimensionGroup(m.graphic));refreshMeasurementDisplays();renderNow('measurements cleared')}
+function clearAutoDimensions(){dimensionGraphics.forEach(disposeDimensionGroup);dimensionGraphics=[];setDimensionControls();renderNow('automatic dimensions cleared')}
 function refreshMeasurementDisplays(){
   for(const m of savedMeasurements){disposeDimensionGroup(m.graphic);m.graphic=makeMeasureGraphic(m.a,m.b,formatMeasured(m.a.distanceTo(m.b)))}
   const list=$('measurementList');list.replaceChildren();
@@ -1122,6 +1137,7 @@ function refreshMeasurementDisplays(){
     row.append(label,button);list.append(row);
   });
   setDimensionControls();
+  renderNow('saved measurements refreshed');
 }
 function addAutoDimensions(){
   if(dimensionGraphics.length){clearAutoDimensions();toast(translateDynamic('Automatic dimensions hidden'));return}
@@ -1133,7 +1149,7 @@ function addAutoDimensions(){
     [new THREE.Vector3(b.max.x+offset,b.max.y+offset,b.min.z),new THREE.Vector3(b.max.x+offset,b.max.y+offset,b.max.z),'Z']
   ];
   for(const [a,c,axis] of values)dimensionGraphics.push(makeMeasureGraphic(a,c,axis+' = '+formatMeasured(a.distanceTo(c))));
-  setDimensionControls();toast(translateDynamic('Automatic dimensions displayed'));
+  setDimensionControls();renderNow('automatic dimensions displayed');toast(translateDynamic('Automatic dimensions displayed'));
 }
 function undoMeasurement(){
   if(measurePoints.length){clearMeasure();toast(translateDynamic('Pending point removed'));return}
@@ -1145,6 +1161,7 @@ function toggleMeasurements(){
   measurementsVisible=!measurementsVisible;
   [...dimensionGraphics,...savedMeasurements.map(m=>m.graphic)].forEach(g=>{if(g)g.visible=measurementsVisible});
   setDimensionControls();
+  renderNow('measurement visibility changed');
 }
 function setDimensionControls(){
   for(const id of ['toggleMeasuresButton','toggleMeasurementVisibility']){
