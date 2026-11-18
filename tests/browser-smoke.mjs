@@ -30,6 +30,7 @@ try {
   assert.ok(initial.renderTriangles > 0,'Demo must render triangles');
   console.log('PASS: demo rendered',initial.renderFrames,initial.renderTriangles);
 
+  const screenshot=()=>page.locator('#cadCanvas').screenshot();
   const area=await page.locator('#cadInteractionLayer').boundingBox();
   assert.ok(area?.width>100&&area?.height>100);
   const x=area.x+area.width*.5, y=area.y+area.height*.50;
@@ -43,6 +44,22 @@ try {
   assert.ok(moved.renderFrames>initial.renderFrames,'Canvas not updated after drag');
   console.log('PASS: camera orbit and frame update');
 
+  // Selection must be highlighted without any mouse orbit; H must hide immediately.
+  const beforeSelection=await screenshot();
+  await page.locator('#assemblyTree .tree-node').nth(1).click();
+  const selectedName=await page.locator('#selectedName').innerText();
+  assert.notEqual(selectedName,'Gesamtes Modell','Tree selection did not activate');
+  await page.waitForTimeout(60);
+  const afterSelection=await screenshot();
+  assert.ok(!beforeSelection.equals(afterSelection),'Selection highlight not rendered after tree click');
+  const beforeH=await getDiag();
+  await page.keyboard.press('h');
+  await page.waitForTimeout(60);
+  const afterH=await getDiag();
+  assert.ok(afterH.renderTriangles<beforeH.renderTriangles,'H shortcut must hide selected part immediately');
+  await page.locator('#showAllButton').click();
+  console.log('PASS: immediate selection highlight and H hide');
+
   await page.locator('#hideAllButton').click();
   const hidden=await getDiag();
   assert.equal(hidden.renderTriangles,0,'Hide all must immediately hide demo triangles');
@@ -51,7 +68,6 @@ try {
   assert.ok(restored.renderTriangles>0,'Show all must immediately restore demo geometry');
   console.log('PASS: hide/show without camera movement');
 
-  const screenshot=()=>page.locator('#cadCanvas').screenshot();
   const beforeExplode=await screenshot();
   await page.locator('#explodeRange').evaluate(el => {
     el.value='70';
