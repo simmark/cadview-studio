@@ -40,6 +40,11 @@ Ziel: Kamera, STEP-Import, Live-Änderungen, Bemaßung und Export bei jedem Rele
 | QA-23 | Browser-Konsole während der Aktionen prüfen | Keine neuen unhandled errors oder WebGL-Kontextverluste | ☐ |
 | QA-24 | Diagnose direkt nach Start und 1 s später kopieren | `loopStarted: true`, `animationTicks` und `renderFrames` steigen auch ohne Mausbewegung | ☐ |
 | QA-25 | Beschädigte gespeicherte Drehvorlagen / blockiertes localStorage simulieren | Demo und Renderloop starten trotzdem; nur Vorlagen-Funktion darf ausfallen | ☐ |
+| QA-26 | Messmodus einschalten, kurz auf zwei Modellflächen klicken | Zwei Messpunkte erzeugen eine gespeicherte Maßlinie; aktive Snap-Vorschau bleibt sichtbar | ☐ |
+| QA-27 | Messmodus aktiv, linke Maustaste ziehen und loslassen | Kamera dreht sofort; **kein** zusätzlicher Messpunkt wird beim Loslassen angelegt | ☐ |
+| QA-28 | Maßtextgröße 70 → 170 %, Snap-Größe 8 → 18 px und hell/dunkel einstellen | Labels/Snap-Vorschau passen sich live an; Einstellungen bleiben nach Neustart gespeichert | ☐ |
+| QA-29 | Installierte CADVIEW-PWA über Explorer → Öffnen mit für .stp/.step/.igs/.iges/.stl/.obj/.glb wählen | CADVIEW wird als Handler angeboten und lädt die gewählte Datei direkt, ohne erneuten Dateidialog | ☐ |
+| QA-30 | In Windows CADVIEW als Standard für .stp setzen, Datei doppelklicken | CADVIEW öffnet die Datei; S-Parameter Analyzer bleibt eigenständig und unverändert | ☐ |
 
 ## Messungsdarstellung – visuelle Akzeptanz
 
@@ -73,4 +78,4 @@ Konsolenfehler: ...
 
 ## Freigaberegel
 
-Eine Beta ist erst dann für den Alltag freigegeben, wenn **QA-01 bis QA-25** getestet, die kritischen Fälle **QA-02, QA-04, QA-05, QA-07, QA-08, QA-11, QA-12, QA-15 und QA-20** erfolgreich sind und keine neuen Fehler auftreten. Bei kritischem Fehler Release nicht als „vollständig getestet“ bezeichnen.
+Eine Beta ist erst dann für den Alltag freigegeben, wenn **QA-01 bis QA-30** getestet, die kritischen Fälle **QA-02, QA-04, QA-05, QA-07, QA-08, QA-11, QA-12, QA-15 und QA-20** erfolgreich sind und keine neuen Fehler auftreten. Bei kritischem Fehler Release nicht als „vollständig getestet“ bezeichnen.
