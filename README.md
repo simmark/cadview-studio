@@ -89,6 +89,45 @@ Verwendete externe Projekte: [Three.js](https://threejs.org/) (`0.180.0`, MIT) u
 - **GLB Export kann Geometrie nicht erhalten:** Der Export ist immer trianguliert. Für die genaue CAD-Bearbeitung die Original-STEP-Datei aufbewahren.
 
 Stand: November 2026 · CADVIEW Studio Beta 1.0
+
 ## Fehlerbehebung STEP-/IGES-Import (Beta 1.0.1)
 
 Die anfängliche Version referenzierte `occt-import-js@0.0.24` im npm-CDN, obwohl npm bisher `0.0.23` veröffentlicht hat. Ab Beta 1.0.1 ist der CAD-Importer auf `0.0.23` korrigiert, nutzt bei Bedarf `unpkg.com` als Ausweichadresse und lädt den Web Worker mit einer versionierten URL. Falls der Browser noch die alte Version zwischengespeichert hat, `Strg+F5` drücken.
+
+---
+
+## CADVIEW Studio 1.2 – Installation und Erweiterungen
+
+**Direkt im Browser:** `https://simmark.github.io/cadview-studio/`
+
+**Als App installieren:** Auf Windows in Chrome oder Edge den Button „⊞ Installieren“ anklicken, wenn der Browser die PWA-Installation anbietet. Falls kein Installationsdialog erscheint: Edge/Chrome-Menü → „Apps“ / „Diese Seite als App installieren“. Auf Android: Chrome-Menü → „App installieren“ / „Zum Startbildschirm hinzufügen“. Auf iOS: Teilen → „Zum Home-Bildschirm“. Die installierte App hat ein eigenes Fenster, Icon und Startmenüeintrag.
+
+Die Installation ist kein natives Windows-Setup (`.exe`), sondern eine Progressive Web App. Sie benötigt beim ersten Öffnen Internet. Der `sw.js` speichert die Oberfläche offline; externe Three.js- und OpenCascade/WASM-Dateien werden bei Netzwerknutzung zwischengespeichert, soweit Browser und Speicherkontingent dies zulassen. **Vollständig offline verfügbares STEP/IGES ist nicht garantiert**: Vor der ersten Offline-Nutzung muss die Engine einmal online geladen worden sein, und Browser können Cache-Daten löschen. Lokale STEP-Dateien werden nicht an einen Server hochgeladen. Die App speichert Projektkonfigurationen nur lokal (Browserspeicher) oder als explizit exportierte `.cadview.json`.
+
+### Baugruppen, Material und GLB-Export
+
+- **Strg-Klick** im Bauteilbaum bzw. im 3D-Fenster: mehrere Teile auswählen; **Umschalt-Klick** im Baum: Bereich auswählen. Materialvorgaben gelten für die Auswahl. Ohne Auswahl wird das gesamte Modell geändert.
+- **Kategorie**: frei benannte Gruppen, z. B. „Pins“, „Wicklung“, „Kern“, „Gehäuse“, „Isolation“. Bei Auswahl einer Baugruppe wird die Kategorie auch für deren Kinder gesetzt.
+- **Exportieren → GLB-Struktur**: „Originale Baugruppe“, „Nach Kategorien“, „Nach Materialien“ oder „Kategorie → Material“. Im GLB entstehen tatsächlich separate Objekte bzw. Gruppen. Mehrfarbige CAD-Meshes werden dafür je Material aufgeteilt. **GLB ist immer ein Dreiecksnetz**, kein parametrischer CAD-Körper.
+- **Studio**: Reflexionslicht (RoomEnvironment) für realistischere visuelle Metalle und Kunststoffe; „Renderbild als PNG (2×)“ für hochauflösenden Screenshot. Kein physikalisch genauer Pathtracer.
+
+### Drehen und Schnitte
+
+- **Ausrichtung**: beliebige Winkel um X, Y oder Z; 90°/180° direkt oder eigener Winkel. Ohne Auswahl wird das gesamte Modell um seine Bounding-Box-Mitte gedreht. Mit Auswahl werden gewählte Baugruppenteile gemeinsam gedreht. Diese Geometrieausrichtung wird beim GLB/STL/OBJ-Export übernommen.
+- **Drehvorlagen** können unter eigenem Namen im Browserspeicher gespeichert und erneut angewendet werden. Mit **Projekt speichern** wird zusätzlich eine `.cadview.json`-Datei erzeugt; diese speichert Ausrichtungen, Materialien, Kategorien, Sichtbarkeit, Punktmessungen und Schnitte. Die Original-CAD-Datei muss zum Wiederverwenden der Projektdatei erneut geöffnet werden.
+- **Schnittebenen**: zwei gleichzeitig aktive orthogonale Ebenen oder die erste mit frei eingegebener Normalenrichtung (nx/ny/nz). Ein/Aus und Positionsslider. Es handelt sich um **Clipping im Viewer**, nicht um geometrisch geschlossene Schnittkörper. Ein GLB/STL/STEP-Export wendet den Schnitt nicht auf die CAD-Geometrie an.
+- **Ansichten**: 3D, oben, unten, vorne, hinten, rechts, links.
+
+### Messen und Bemaßen
+
+- **Messen**: zwei Punkte auf sichtbaren Dreiecksflächen anklicken. Fangoptionen: Klick auf Fläche, nahe einer triangulierten **Mesh-Ecke** oder **Mesh-Kante** (ca. 15 px). Danach wird 3D-Abstand sowie ΔX, ΔY, ΔZ angezeigt; Messungen bleiben als sichtbare Linien und Zahlen im 3D-Modell.
+- **Breite / Tiefe / Höhe einzeichnen**: automatische Hüllmaß-Bemaßungen der Auswahl oder des gesamten Modells. Gut für einzelne Wicklungen, Kerne und Gehäuse, die zuerst isoliert wurden. Die automatische Hüllmaßbemaßung ist keine echte Form- oder Fertigungsbemaßung. Genauigkeit des Eck-/Kantenfangs hängt von der importierten Dreiecksauflösung ab; für hochgenaue CAD-Kantenmessung wird eine OpenCascade-TopoDS-Edge-Analyse benötigt.
+- Exportierte Screenshots enthalten die Messlinien. Die `.cadview.json` enthält Punktmessungen, aber keine Original-Geometriedaten.
+
+### STEP-Schreibunterstützung – noch nicht vollständig
+
+**Wichtig:** `occt-import-js` ist ein STEP/IGES-**Importer**, kein STEP-Writer. Globale und individuelle Drehungen werden exakt an den 3D-Objekttransformationen geführt und nach **GLB/STL/OBJ** exportiert, aber aktuell **nicht als bearbeitbare gedrehte STEP-Datei** geschrieben. Der Menüpunkt „STEP (Original)“ exportiert ausschließlich die unmodifizierte, ursprünglich geladene STEP-Datei, solange noch keine Drehung erfolgt ist.
+
+Ein Versuch, STEP-Positionskoordinaten und Richtungen ohne vollständigen CAD-Kernel direkt zu rotieren, wurde mit der echten STEP-Datei `615108137421R.stp` durch OpenCascade getestet: Die exportierte Datei blieb zwar einlesbar und enthielt 13 Solids, ihr geometrisches Bounding-Box-Maß war jedoch falsch. Dieser fehlerhafte Weg wurde **nicht** veröffentlicht. Für einen korrekten STEP-Export der gedrehten BRep-Körper wird ein Browser-WASM mit `STEPControl_Writer` und `BRepBuilderAPI_Transform` oder `STEPCAFControl_Writer` benötigt. Bei mehrfach gedrehten Einzelteilen müssen zudem Baugruppenhierarchien und Platzierungen übernommen werden.
+
+**Version 1.2.0**. Die UI, Dateien, JSON- und JavaScript-Syntax wurden geprüft; dynamische Material-Render- und CDN-Importfunktionen sind im Zielbrowser zu testen.
