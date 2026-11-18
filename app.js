@@ -9,6 +9,8 @@ import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('cadCanvas');
+// Separate interactive pointer layer above the WebGL canvas.
+const interactionSurface = $('cadInteractionLayer') || canvas;
 const viewport = $('canvasArea');
 const scene = new THREE.Scene();
 const darkColor = new THREE.Color('#101d2b');
@@ -24,7 +26,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.36;
 renderer.localClippingEnabled = true;
-const controls = new OrbitControls(camera, canvas);
+const controls = new OrbitControls(camera, interactionSurface);
 controls.enableDamping = true;
 controls.dampingFactor = 0.085;
 controls.minDistance = 0.01;
@@ -368,7 +370,32 @@ function setView(type){
   camera.up.set(0,0,1); if(type==='top')camera.up.set(0,1,0);if(type==='bottom')camera.up.set(0,-1,0);
   camera.lookAt(center);controls.update();
   document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===type));
+  if($('inputFeedback'))$('inputFeedback').textContent=(language()==='en'?'View: ':'Ansicht: ')+type;
 }
+// Camera orbit only: these controls never change CAD geometry or exports.
+function orbitView(yawDegrees=0,pitchDegrees=0){
+  if(!modelRoot)return;
+  camera.updateMatrixWorld();
+  const center=controls.target.clone(),offset=camera.position.clone().sub(center);
+  if(offset.lengthSq()<1e-12){fitToObject(modelRoot);return}
+  const zUp=new THREE.Vector3(0,0,1);
+  if(yawDegrees)offset.applyAxisAngle(zUp,THREE.MathUtils.degToRad(yawDegrees));
+  if(pitchDegrees){
+    const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0).normalize();
+    const changed=offset.clone().applyAxisAngle(right,THREE.MathUtils.degToRad(pitchDegrees));
+    if(Math.abs(changed.clone().normalize().dot(zUp))<.985)offset.copy(changed);
+  }
+  camera.up.set(0,0,1);camera.position.copy(center).add(offset);camera.lookAt(center);controls.update();
+  document.querySelectorAll('[data-view]').forEach(el=>el.classList.remove('active'));
+  if($('inputFeedback'))$('inputFeedback').textContent=language()==='en'?'Free camera view':'Freie Kameransicht';
+}
+controls.addEventListener('start',()=>interactionSurface.classList.add('is-dragging'));
+controls.addEventListener('end',()=>interactionSurface.classList.remove('is-dragging'));
+controls.addEventListener('change',()=>{
+  if(!interactionSurface.classList.contains('is-dragging'))return;
+  document.querySelectorAll('[data-view]').forEach(el=>el.classList.remove('active'));
+  if($('inputFeedback'))$('inputFeedback').textContent=language()==='en'?'Camera moving':'Kamera bewegen';
+});
 function closestNodeFromObject(obj){let v=obj;while(v&&v!==modelRoot){if(nodeByObject.has(v))return nodeByObject.get(v);v=v.parent;}return null}
 function selectionBounds(){
   if(!selectedNodes.size)return contentBounds(modelRoot);
@@ -396,6 +423,7 @@ function selectNode(node, multi=false){
   $('selectedInfo').textContent=count===0?'Kein einzelnes Bauteil ausgewählt':count>1?'Gemeinsame Material- und Kategorie-Einstellungen':selected.isPart?'Bauteil / Komponente':'Baugruppe';
   $('partCategory').value=count===1?(selected.category||'Sonstige'):'';
   updateMaterialControls();updateDimensions();
+  if($('inputFeedback')&&count>0)$('inputFeedback').textContent=language()==='en'?`${count} part(s) selected`:`${count} Bauteil(e) ausgewählt`;
 }
 function selectedPartNodes(){return [...selectedNodes];}
 function getTargetMeshes(){
@@ -591,8 +619,8 @@ function screenIntersections(evt){
   return raycaster.intersectObjects(getMeshes(modelRoot).filter(isActuallyVisible),false).filter(hit=>!clipEnabled || sectionPlane.distanceToPoint(hit.point)>=-0.00001);
 }
 let pointerDown = null;
-canvas.addEventListener('pointerdown',e=>{if(e.button===0)pointerDown={x:e.clientX,y:e.clientY}});
-canvas.addEventListener('pointerup',e=>{
+interactionSurface.addEventListener('pointerdown',e=>{if(e.button===0)pointerDown={x:e.clientX,y:e.clientY};if($('inputFeedback'))$('inputFeedback').textContent=language()==='en'?'Pointer received · drag to orbit':'Eingabe erkannt · ziehen zum Drehen';});
+interactionSurface.addEventListener('pointerup',e=>{
   if(e.button!==0||!pointerDown)return;
   const delta=Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y);
   pointerDown=null;if(delta>5||!modelRoot)return;
@@ -747,8 +775,8 @@ function renderNotice(message, isFatal=false){
   panel.dataset.fatal=String(isFatal);
 }
 function clearRenderNotice(){ $('renderNotice')?.classList.add('hidden'); }
-canvas.addEventListener('webglcontextlost',ev=>{ev.preventDefault();wasContextLost=true;renderNotice('Die 3D-Grafikverbindung wurde unterbrochen. Bitte Ansicht neu laden.',true)});
-canvas.addEventListener('webglcontextrestored',()=>{wasContextLost=false;lastRenderFailure='';clearRenderNotice();resize();fitToObject(modelRoot)});
+interactionSurface.addEventListener('webglcontextlost',ev=>{ev.preventDefault();wasContextLost=true;renderNotice('Die 3D-Grafikverbindung wurde unterbrochen. Bitte Ansicht neu laden.',true)});
+interactionSurface.addEventListener('webglcontextrestored',()=>{wasContextLost=false;lastRenderFailure='';clearRenderNotice();resize();fitToObject(modelRoot)});
 function recoverViewport(){
   if(!modelRoot)return;
   // Clear filters that can hide every part, without modifying the CAD data.
@@ -1429,9 +1457,11 @@ $('isolateButton').addEventListener('click',isolateSelection);
 $('resetVisibilityButton').addEventListener('click',showAll);
 $('clearSelectionButton').addEventListener('click',()=>{selectNode(null);updateTree()});
 document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>setView(el.dataset.view)));
+document.querySelectorAll('[data-orbit]').forEach(el=>el.addEventListener('click',()=>{const dir=el.dataset.orbit;orbitView(dir==='left'?-30:dir==='right'?30:0,dir==='up'?20:dir==='down'?-20:0)}));
+$('quickRotateModel')?.addEventListener('click',()=>{rotateActive('z',90);document.querySelector('[data-panel=transform]')?.click()});
 $('gridButton').addEventListener('click',()=>{const next=!grid.visible;grid.visible=next;axes.visible=next;$('gridButton').classList.toggle('active',next);$('gridButton').setAttribute('aria-pressed',String(next))});
 $('wireframeButton').addEventListener('click',()=>{edgesEnabled=!edgesEnabled;showEdges(edgesEnabled);$('wireframeButton').classList.toggle('active',edgesEnabled);$('wireframeButton').setAttribute('aria-pressed',String(edgesEnabled))});
-$('measureButton').addEventListener('click',()=>{measuring=!measuring;clearMeasure();canvas.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast(language()==='en'?'Measure: click two points. Magnetic snapping is enabled.':'Messen: Zwei Punkte anklicken. Magnetischer Fang ist aktiviert.')});
+$('measureButton').addEventListener('click',()=>{measuring=!measuring;clearMeasure();interactionSurface.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast(language()==='en'?'Measure: click two points. Magnetic snapping is enabled.':'Messen: Zwei Punkte anklicken. Magnetischer Fang ist aktiviert.')});
 $('sectionButton').addEventListener('click',()=>{clipEnabled=!clipEnabled;$('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection();$('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled))});
 $('sectionRange').addEventListener('input',updateSection);
 for(const id of ['sectionAxis','sectionInvert','sectionNx','sectionNy','sectionNz','section2Axis','section2Range','section2Invert']) $(id).addEventListener('input',updateSection);
@@ -1466,7 +1496,7 @@ window.addEventListener('dragleave',e=>{if(e.relatedTarget===null||!document.ele
 window.addEventListener('drop',e=>{e.preventDefault();$('dropOverlay').classList.add('hidden');const f=e.dataTransfer?.files?.[0];if(f)loadFile(f)});
 window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='o'){e.preventDefault();openFileDialog()}
-  if(e.key==='Escape' && !$('helpDialog').open){if(measuring){measuring=false;$('measureButton').classList.remove('active');clearMeasure();canvas.style.cursor='grab'}else{selectNode(null);updateTree()}closeMobilePanels()}
+  if(e.key==='Escape' && !$('helpDialog').open){if(measuring){measuring=false;$('measureButton').classList.remove('active');clearMeasure();interactionSurface.style.cursor='grab'}else{selectNode(null);updateTree()}closeMobilePanels()}
   if(e.key.toLowerCase()==='f')fitToObject(selected?.obj||modelRoot);
 });
 
@@ -1492,8 +1522,8 @@ $('toggleMeasurementVisibility').addEventListener('click',toggleMeasurements);
 $('measureBoundsButton').addEventListener('click',addAutoDimensions);
 $('clearAllMeasurements').addEventListener('click',()=>{clearSavedMeasurements();clearAutoDimensions();toast('Alle Bemaßungen entfernt.')});
 $('measureUnits').addEventListener('change',refreshMeasurementDisplays);
-canvas.addEventListener('pointermove',e=>{if(!measuring)return;if(cadence.hovering)return;cadence.hovering=true;requestAnimationFrame(()=>{cadence.hovering=false;showSnapPreview(e)})});
-canvas.addEventListener('pointerleave',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
+interactionSurface.addEventListener('pointermove',e=>{if(!measuring)return;if(cadence.hovering)return;cadence.hovering=true;requestAnimationFrame(()=>{cadence.hovering=false;showSnapPreview(e)})});
+interactionSurface.addEventListener('pointerleave',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
 $('measureSnap').addEventListener('change',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
 $('installButton').addEventListener('click',promptInstallation);
 initializePWA();
