@@ -144,3 +144,15 @@ Ein Versuch, STEP-Positionskoordinaten und Richtungen ohne vollständigen CAD-Ke
 - **PNG-Wasserzeichen**: optionaler eingebetteter Wort-/Symbol-Schriftzug `CADVIEW by SIMONLATION`, im Rendering und beim einfachen Screenshot. Verwendet eine vektorartig gezeichnete SIM-Marke als typografische Annäherung; kein offizielles, eingebundenes Logo-Asset.
 
 Die PWA verwendet weiterhin die eindeutige App-ID `/cadview-studio/` und bleibt unabhängig von `s-parameter-plotter`. STEP-Bearbeitung und exakter STEP-Reexport nach Drehung sind **nicht** Bestandteil dieses Updates.
+
+## Beta 1.4.0 – GUI Rework und Rendering-Diagnose
+
+- Der Inspektor ist in fünf fokussierte Bereiche aufgeteilt: **Material**, **Ausrichten**, **Schnitt**, **Ansicht**, **Messen**. Alle vorhandenen Einstellungen und IDs sind erhalten geblieben.
+- Das Rendering läuft unabhängig von Achsenwidget, Auswahlmarkierung und Messgrafik weiter. Fehler in diesen nichtkritischen Overlays stoppen die 3D-Ausgabe nicht mehr.
+- Eine sichtbare Render-Diagnose erscheint bei WebGL-Fehlern oder wenn trotz importierter Geometrie keine Dreiecke gezeichnet werden. **Einpassen** (`0`) setzt Sichtbarkeit, Kamera und Schnittebene zurück, ohne die Quelldatei zu verändern.
+- Einführung als kleine, schließbare Karte statt blockierender Vollbild-Hilfe. F1 bzw. `?` öffnen weiterhin die vollständige Hilfe.
+- Separates `gui.js`/`rework.css` für den GUI-Layer. PWA-ID `/cadview-studio/` bleibt unverändert, daher keine Überschneidung mit S-Parameter Analyzer.
+
+### Einschränkung und Testhinweise
+
+Die Änderungen wurden auf Syntax, Dateikonsistenz, HTML-IDs und CSS geprüft. Ein vollständiger echter WebGL-Browsertest war in der vorhandenen Testumgebung nicht möglich. Daher erst Demo prüfen, dann die reale STEP-Datei erneut laden und ggf. das sichtbare Fehlerprotokoll beziehungsweise die Browserkonsole beobachten. Der STEP-Export bleibt unverändert ein Download des Original-CAD, keine neu berechnete B-Rep-Geometrie.
