@@ -21,6 +21,23 @@ for (const filename of ['app.js', 'gui.js', 'occt-worker.js', 'sw.js']) {
 
 assert.equal(manifest.id, '/cadview-studio/', 'CADVIEW PWA must have a unique identity');
 assert.equal(manifest.scope, '/cadview-studio/', 'CADVIEW PWA must have its own scope');
+assert.ok(Array.isArray(manifest.file_handlers)&&manifest.file_handlers.length>0,'CAD file association registration missing');
+const cadHandler=manifest.file_handlers.find(h=>h.action==='/cadview-studio/');
+assert.ok(cadHandler,'CAD file handlers must launch within the CADVIEW PWA scope');
+const allowedExt=new Set(Object.values(cadHandler.accept).flat());
+for(const ext of ['.stp','.step','.igs','.iges','.stl','.obj','.glb','.brep']){
+  assert.ok(allowedExt.has(ext),'File handler extension missing: '+ext);
+}
+assert.ok(app.includes('window.launchQueue.setConsumer('),'OS file launch consumer missing');
+assert.ok(app.includes('await loadFile(file)'),'File launch must reuse local CAD importer');
+assert.ok(app.includes('MEASURE_DRAG_THRESHOLD'),'Measurement mode click/drag threshold missing');
+assert.ok(app.includes("!measuring || (d.moved>MEASURE_DRAG_THRESHOLD)"),'Measurement drag must orbit camera');
+for(const id of ['measureLabelSize','measureSnapSize','measureLabelStyle','measureLabelSizeValue','measureSnapSizeValue']){
+  assert.ok(ids.has(id),'Measurement appearance control missing: '+id);
+}
+assert.ok(app.includes('function setupMeasurementAppearance()'),'Measurement preferences setup missing');
+assert.ok(app.includes('cadview-measure-appearance-v1'),'Measurement local storage key missing');
+
 
 const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
 const refs = new Set([...app.matchAll(/\$\('([^']+)'\)/g), ...gui.matchAll(/\$\('([^']+)'\)/g)].map(m=>m[1]));
