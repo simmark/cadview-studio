@@ -1112,19 +1112,43 @@ function formatMeasured(raw){
   const value=unit==='mm'?mm:unit==='cm'?mm/10:unit==='m'?mm/1000:mm/25.4;
   return value.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3})+' '+(unit==='inch'?'in':unit);
 }
-function createDimensionSprite(label){
-  const cv=document.createElement('canvas'); cv.width=512;cv.height=104;
+// Rendered onto a high-resolution texture and scaled to constant screen pixels.
+// Dark and light backgrounds both keep high contrast against CAD materials.
+function dimensionLabelTexture(label){
+  const cv=document.createElement('canvas');
+  cv.width=1024;cv.height=212;
   const c=cv.getContext('2d');
-  c.fillStyle=lightTheme?'rgba(255,255,255,.94)':'rgba(15,36,50,.92)';
-  c.strokeStyle=lightTheme?'rgba(27,145,146,.6)':'rgba(72,214,208,.75)';c.lineWidth=3;
-  c.beginPath();c.roundRect(3,3,506,98,13);c.fill();c.stroke();
-  c.fillStyle=lightTheme?'#163c4e':'#e0fefa';c.font='600 58px system-ui';
-  c.textAlign='center';c.textBaseline='middle';c.fillText(label.slice(0,30),256,53);
-  const texture=new THREE.CanvasTexture(cv);texture.colorSpace=THREE.SRGBColorSpace;
-  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));
-  sprite.userData.pixelWidth=Math.min(132,Math.max(78,label.length*5.8+18));
-  sprite.userData.pixelHeight=18;
-  sprite.renderOrder=103;return sprite;
+  const dark=measurementAppearance.labelStyle!=='light';
+  c.shadowColor='rgba(0,0,0,.30)';c.shadowBlur=14;c.shadowOffsetY=5;
+  c.fillStyle=dark?'rgba(11,32,45,.97)':'rgba(248,253,255,.99)';
+  c.strokeStyle=dark?'#58dad2':'#158e95';
+  c.lineWidth=6;
+  c.beginPath();c.roundRect(7,8,1010,194,25);c.fill();c.stroke();
+  c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetY=0;
+  const content=String(label).slice(0,64);
+  let size=106;
+  c.textAlign='center';c.textBaseline='middle';
+  do {c.font=`700 ${size}px system-ui`;if(c.measureText(content).width<=952)break;size-=3}while(size>34);
+  c.fillStyle=dark?'#f2fffe':'#102c3e';
+  c.fillText(content,512,107,952);
+  const texture=new THREE.CanvasTexture(cv);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  return texture;
+}
+function createDimensionSprite(label){
+  const text=String(label);
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({
+    map:dimensionLabelTexture(text),
+    depthTest:false,depthWrite:false,transparent:true
+  }));
+  sprite.userData.dimensionLabel=text;
+  sprite.userData.basePixelWidth=Math.min(245,Math.max(110,text.length*8.4+34));
+  sprite.userData.basePixelHeight=29;
+  const ratio=measurementAppearance.labelPercent/100;
+  sprite.userData.pixelWidth=sprite.userData.basePixelWidth*ratio;
+  sprite.userData.pixelHeight=sprite.userData.basePixelHeight*ratio;
+  sprite.renderOrder=103;
+  return sprite;
 }
 function makeMeasureGraphic(a,b,label){
   const g=new THREE.Group();g.name='Bemaßung · '+label;
@@ -1140,11 +1164,11 @@ function makeMeasureGraphic(a,b,label){
   const sprite=createDimensionSprite(label);
   sprite.position.copy(a).add(b).multiplyScalar(.5);
   sprite.userData.anchor=sprite.position.clone();
-  sprite.userData.pixelOffset=12;
+  sprite.userData.pixelOffset=sprite.userData.pixelHeight/2+9;
   const pp=worldPerPixel(sprite.position);
   sprite.scale.set(sprite.userData.pixelWidth*pp,sprite.userData.pixelHeight*pp,1);
   camera.updateMatrixWorld(true);
-  sprite.position.addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize(),pp*12);
+  sprite.position.addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize(),pp*sprite.userData.pixelOffset);
   g.add(sprite);g.visible=measurementsVisible;scene.add(g);return g;
 }
 function disposeDimensionGroup(g){
@@ -1214,7 +1238,15 @@ function worldPerPixel(p){
 function updateMeasurementScale(){
   const resizeGroup=g=>{if(!g||!g.visible)return;g.traverse(o=>{
     if(o.userData.pixelRadius){const size=worldPerPixel(o.getWorldPosition(new THREE.Vector3()))*o.userData.pixelRadius;o.scale.setScalar(size)}
-    if(o.isSprite&&o.userData.pixelWidth){const anchor=o.userData.anchor||o.position;const pp=worldPerPixel(anchor);o.scale.set(o.userData.pixelWidth*pp,o.userData.pixelHeight*pp,1);if(o.userData.pixelOffset&&o.userData.anchor){o.position.copy(anchor).addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize(),pp*o.userData.pixelOffset)}}
+    if(o.isSprite&&o.userData.pixelWidth){
+      const anchor=o.userData.anchor||o.position;
+      const pp=worldPerPixel(anchor);
+      o.scale.set(o.userData.pixelWidth*pp,o.userData.pixelHeight*pp,1);
+      if(o.userData.pixelOffset&&o.userData.anchor){
+        o.userData.pixelOffset=o.userData.pixelHeight/2+9;
+        o.position.copy(anchor).addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize(),pp*o.userData.pixelOffset);
+      }
+    }
   })};
   for(const g of dimensionGraphics)resizeGroup(g);
   for(const m of savedMeasurements)resizeGroup(m.graphic);
