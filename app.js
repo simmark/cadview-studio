@@ -431,6 +431,7 @@ function selectNode(node, multi=false){
   updateMaterialControls();updateDimensions();
   if($('inputFeedback')&&count>0)$('inputFeedback').textContent=language()==='en'?`${count} part(s) selected`:`${count} Bauteil(e) ausgewählt`;
   // SelectionBox3, tree clicks and raycast picks must become visible immediately.
+  refreshSelectionBox();
   renderNow('selection changed');
 }
 function selectedPartNodes(){return [...selectedNodes];}
@@ -493,7 +494,7 @@ function updateTree(){
     if(!nodeVisible(node))row.classList.add('dimmed');
     const indent=document.createElement('span');indent.className='tree-indent';indent.style.setProperty('--indent',Math.min(depth,15)*13+'px');row.append(indent);
     const arrow=document.createElement('button');arrow.className='tree-arrow'+(node.children.length?'':' empty');arrow.textContent=node.collapsed&&!term?'▸':'▾';arrow.title='Bauteile ein-/ausklappen';arrow.addEventListener('click',e=>{e.stopPropagation();node.collapsed=!node.collapsed;updateTree()});row.append(arrow);
-    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.textContent=nodeVisible(node)?'◉':'◌';eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions();renderNow('single part visibility changed')});row.append(eye);
+    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.textContent=nodeVisible(node)?'◉':'◌';eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions();refreshSelectionBox();renderNow('single part visibility changed')});row.append(eye);
     const icon=document.createElement('span');icon.className='tree-symbol'+(node.isPart?' mesh':'');icon.textContent=node.isPart?'⬡':'▤';row.append(icon);
     const name=document.createElement('span');name.className='tree-name';name.textContent=node.obj.name||'Unbenannt';name.title=node.obj.name;row.append(name);
     row.addEventListener('click',e=>{
@@ -510,8 +511,8 @@ function updateTree(){
   root.append(frag);
   if(!root.children.length){const el=document.createElement('div');el.className='tree-no-results';el.textContent='Keine passenden Bauteile';root.append(el)}
 }
-function showAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=true);updateTree();updateDimensions();renderNow('all visible')}
-function hideAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=false);updateTree();updateDimensions();renderNow('all hidden')}
+function showAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=true);updateTree();updateDimensions();refreshSelectionBox();renderNow('all visible')}
+function hideAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=false);updateTree();updateDimensions();refreshSelectionBox();renderNow('all hidden')}
 function isolateSelection(){if(!selectedNodes.size){toast('Bitte zuerst mindestens ein Bauteil auswählen.');return}
   allNodes.forEach(n=>n.obj.visible=false);
   for(const node of selectedNodes){
@@ -797,6 +798,7 @@ let framesRendered = 0;
 let lastStartupFailure = '';
 let loopStarted = false;
 let lastRenderAt = 0;
+let animationTicks = 0;
 function renderNow(reason=''){
   if(wasContextLost)return false;
   if(!viewport.clientWidth||!viewport.clientHeight)return false;
@@ -850,6 +852,7 @@ function recoverViewport(){
   else toast(language()==='en'?'Model and camera reset.':'Modell und Kamera zurückgesetzt.');
 }
 function animate(){
+  animationTicks++;
   requestAnimationFrame(animate);
   if(wasContextLost||document.hidden)return;
   if(!renderNow('animation frame'))return;
@@ -1517,7 +1520,7 @@ function setupHelpAndLocalization(){
     else if(action==='hide'){
       if(!selectedNodes.size)return toast(language()==='en'?'Select a part first':'Bitte zuerst ein Bauteil auswählen.');
       for(const node of selectedNodes)node.obj.visible=false;
-      updateTree();updateDimensions();
+      updateTree();updateDimensions();refreshSelectionBox();
       renderNow('keyboard hide');
     }
     else if(action==='isolate')isolateSelection();
@@ -1651,7 +1654,7 @@ $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
   const report={version:'1.4.5',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
     size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
-    mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,
+    mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,animationTicks,
     lastRenderFailure:lastRenderFailure.slice(0,900),lastStartupFailure:lastStartupFailure.slice(0,900),
     lastRenderAgeMs:lastRenderAt?Math.round(performance.now()-lastRenderAt):null,
     webglContextLost:renderer.getContext().isContextLost(),
