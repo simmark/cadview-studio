@@ -112,6 +112,43 @@ try {
   assert.ok(!afterDimensions.equals(afterHiddenDimensions),'Dimension visibility must redraw immediately');
   console.log('PASS: dimension toggle and redraw');
 
+  // Dimension label and snap marker scale/contrast are live and independent.
+  await page.locator('#toggleMeasurementVisibility').click();
+  const labelBeforeSize=await screenshot();
+  await page.locator('#measureLabelSize').evaluate(el=>{
+    el.value='170';el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  assert.equal(await page.locator('#measureLabelSizeValue').innerText(),'170 %');
+  const labelAfterSize=await screenshot();
+  assert.ok(!labelBeforeSize.equals(labelAfterSize),'Dimension label size must update live');
+  await page.locator('#measureSnapSize').evaluate(el=>{
+    el.value='18';el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  assert.equal(await page.locator('#measureSnapSizeValue').innerText(),'18 px');
+  const measuredStyle=await page.locator('#snapMarker').evaluate(el=>getComputedStyle(el).width);
+  assert.equal(measuredStyle,'18px','Snap marker must follow chosen pixel size');
+  const preferences=await page.evaluate(()=>JSON.parse(localStorage.getItem('cadview-measure-appearance-v1')));
+  assert.equal(preferences.snapPx,18);
+  assert.equal(preferences.labelPercent,170);
+  console.log('PASS: scalable, persistent dimension labels and snap symbols');
+
+  // In measurement mode: a left drag still rotates the camera, and must NOT place a point.
+  await page.locator('#measureButton').click();
+  const beforeMeasureOrbit=await getDiag();
+  assert.equal(beforeMeasureOrbit.measuring,true,'Measure mode not enabled');
+  const beforeCount=await page.locator('#measurementList .measurement-entry').count();
+  await page.mouse.move(x,y);
+  await page.mouse.down();
+  await page.mouse.move(x+105,y+30,{steps:12});
+  await page.mouse.up();
+  const afterMeasureOrbit=await getDiag();
+  const afterCount=await page.locator('#measurementList .measurement-entry').count();
+  assert.ok(afterMeasureOrbit.events.orbits>beforeMeasureOrbit.events.orbits,
+    'Left mouse drag must still orbit the camera in measurement mode');
+  assert.equal(afterCount,beforeCount,'Drag released unexpectedly created a measurement');
+  await page.locator('#measureButton').click();
+  console.log('PASS: measure-mode left drag orbits without creating points');
+
   const exportButton=page.locator('#exportButton');
   await exportButton.click();
   const info=await page.locator('#exportMenu').evaluate(el => {
