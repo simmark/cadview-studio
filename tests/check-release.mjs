@@ -37,6 +37,11 @@ assert.ok(appTag && cssTag,'App and GUI stylesheet must be versioned');
 assert.ok(sw.includes("'./" + appTag + "'"), 'PWA precache must track app JS');
 assert.ok(sw.includes("'./" + cssTag + "'"), 'PWA precache must track rework CSS');
 assert.ok(app.includes('function renderNow('),'Direct redraw API missing');
+assert.ok(app.includes("renderNow('selection changed')"),'Selection must redraw without mouse movement');
+assert.ok(app.includes("renderNow('keyboard hide')"),'H shortcut must redraw immediately');
+assert.ok(app.includes("refreshSelectionBox();\n  renderNow('selection changed')"),'Selection bounds must be synchronized before rendering');
+assert.ok(app.indexOf('startRenderLoop();') < app.indexOf("safeStartup('PWA'"), 'Render loop must start before optional UI initialization');
+assert.ok(app.includes('animationTicks'),'Render loop diagnostic counter missing');
 
 for (const id of ['showAll','hideAll','updateSection','updateExplode','toggleMeasurements','makeMeasureGraphic']) {
   assert.ok(app.includes('function '+id+'('),'Scene function missing: '+id);
