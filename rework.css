@@ -183,3 +183,19 @@ body > #exportMenu.export-menu [data-export]{position:relative;z-index:0}
 #snapMarker.snap-marker[data-kind="quarter"]{border-radius:0 75% 0 0}
 #snapMarker.snap-marker[data-kind="faceCenter"]{border-radius:50%;background:transparent}
 @media(max-width:650px){body > #exportMenu.export-menu{max-height:calc(100dvh - 65px)}}
+
+/* CADVIEW 1.4.6 — measurement readability, persistent preferences, visible snap marks. */
+.measure-appearance{border:1px solid var(--line);background:var(--soft);border-radius:9px;padding:13px 12px;margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.measure-appearance-heading{font-size:10px;letter-spacing:1px;font-weight:800;color:var(--muted);margin-bottom:1px}
+.measure-appearance-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11px;color:var(--text)}
+.measure-appearance-row label{font-size:11px}
+.measure-appearance-row output{color:var(--cyan);font-weight:700;font-variant-numeric:tabular-nums}
+.measure-appearance input[type=range]{width:100%;margin:0 0 4px}
+.measure-appearance .field-label{margin:2px 0 -4px}
+.measure-appearance select{width:100%}
+.measure-gesture-hint{margin:0!important;font-size:10px;line-height:1.5}
+#snapMarker.snap-marker{width:var(--cad-snap-size,13px)!important;height:var(--cad-snap-size,13px)!important;border-width:2px!important;box-shadow:0 0 0 2px rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.28);background:#eafffd}
+#snapMarker.snap-marker[data-kind="edge"]{width:calc(var(--cad-snap-size,13px)*1.45)!important;height:calc(var(--cad-snap-size,13px)*.5)!important}
+#snapMarker.snap-marker[data-kind="midpoint"]{border-radius:50% 50% 0 0}
+#snapMarker.snap-marker[data-kind="faceCenter"]{border-radius:50%;background:transparent;border-width:3px!important}
+#snapMarker.snap-marker[data-kind="surface"]{width:calc(var(--cad-snap-size,13px)*.7)!important;height:calc(var(--cad-snap-size,13px)*.7)!important;border-radius:50%}
