@@ -212,3 +212,20 @@ Auf Basis der gemeldeten Edge-PWA-Probleme wurden die folgenden Bereiche gezielt
 - **Automatische statische Prüfung:** `node tests/check-release.mjs`; GitHub-Workflow `.github/workflows/cadview-static-qa.yml`.
 - **Optionaler echter Chromium-WebGL-Smoke-Test:** `tests/browser-smoke.mjs` im GitHub-Workflow `.github/workflows/cadview-browser-smoke.yml` (unter **Actions → CADVIEW browser WebGL smoke test (manual) → Run workflow** starten). Testet Demo-Orbit, Sofortanzeigen, Explosionsansicht, Schnitt, automatische Bemaßung und das Export-Popup. Benötigt Internet zum Laden von Three.js und Software-WebGL im GitHub-Runner. Firmen-STEP-Dateien werden dabei **nicht** hochgeladen.
 - **Prüfstatus:** Quellcode- und DOM-Verknüpfungsprüfung bestanden. Ein vollständiger interaktiver WebGL-Test auf der installierten Edge-PWA ist **noch nicht bestätigt**. Die App nicht als vollständig regressionstested ausgeben, bevor die manuellen Fälle erledigt sind.
+
+## Beta 1.4.5 – Auswahl und Tastatur-H sofort sichtbar
+
+**Diagnose aus Edge:** Die gemeldete Version 1.4.3 hatte `renderFrames: 606`, aber `loopStarted: false`. Der Viewer konnte einzelne Bilder als Folge von Zeigereignissen zeichnen, ohne dass die permanente Animationsschleife gestartet worden war. Die alte Startreihenfolge hatte `startRenderLoop()` erst *nach* optionalen Initialisierungen für PWA, Sprache, gespeicherte Vorlagen und Theme. Ein Fehler davor konnte die Animationsschleife dauerhaft verhindern. Die exakte ursprünglich ausgelöste Ausnahme wurde nicht mitgeliefert.
+
+Korrekturen in Beta 1.4.5:
+
+- `startRenderLoop()` läuft vor allen optionalen UI-Initialisierungen. Diese werden separat mit Fehlerbehandlung ausgeführt.
+- Defekte, unerwartete oder blockierte `cadview-rotations`-Einträge brechen den Viewer-Start nicht mehr ab.
+- `selectNode()` aktualisiert den Auswahlrahmen und rendert ihn **direkt** nach einer Auswahl im Baugruppenbaum oder auf dem Modell.
+- Das Tastenkürzel **H** aktualisiert Auswahlrahmen, Sichtbarkeit und Darstellung **direkt**. Die Augensymbole und „alle ein-/ausblenden“ aktualisieren ebenfalls den Auswahlrahmen vor dem Redraw.
+- Diagnose meldet `version: 1.4.5` und zusätzlich `animationTicks` (Animation) neben `renderFrames` (alle erfolgreichen Zeichnungen). Damit lässt sich eine wieder fehlende Animationsschleife eindeutig erkennen.
+- Versionierte neue `app.js` und PWA-Cache `1.4.5`. Die eindeutige PWA-ID `/cadview-studio/` sowie das S-Parameter-Tool bleiben unverändert.
+
+### Freigabe
+
+Nach dem Laden muss `BETA 1.4.5` im Header erscheinen. Ohne jede Mausbewegung muss `animationTicks` nach kurzer Zeit steigen. Auswahl einer Baugruppe/Komponente und **H** müssen sofort sichtbar reagieren. Die präzisen Browser-Testfälle stehen in `QA-TESTPROTOKOLL.md` (QA-05, QA-24, QA-25); der Chromium-Smoke-Test prüft Auswahl, H und die autonome Render-Schleife. **Code/Syntax geprüft, vollständiger Edge-PWA-Livetest noch offen.**
