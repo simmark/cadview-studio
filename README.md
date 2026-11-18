@@ -167,3 +167,16 @@ Die WebGL-Zeichenfläche verarbeitet keine Maus- oder Touch-Events mehr. Eine se
 Eine kleine Anzeige im Viewport zeigt an, ob Zeigereingaben eintreffen. Für die installierte Edge-PWA sind die CSS- und JS-Dateien auf Version `1.4.1` umgestellt und der CADVIEW-eigene Service-Worker-Cache wird erneuert. Die PWA-ID bleibt `/cadview-studio/`; der S-Parameter Analyzer wird nicht verändert.
 
 **Test:** Demo öffnen, mit linker Maustaste über der Baugruppe ziehen, Mausrad zoomen, rechte Maustaste ziehen; ein Bauteil im Baum auswählen und `↻ Teil 90°` klicken; danach dieselben Funktionen mit einer importierten STEP-Datei prüfen.
+
+## Beta 1.4.2 – eigenständige Maussteuerung und Diagnose
+
+Die früheren Versionen stützten sich für die Mausbewegung allein auf die an das Canvas beziehungsweise die Interaktionsfläche gebundenen Three.js-`OrbitControls`. Weil die Eingabe bei der installierten Edge-PWA trotz sichtbarer Szene nicht zuverlässig funktionierte, verarbeitet CADVIEW in Version 1.4.2 Pointer-Bewegungen, Schwenken und Rad-Zoom selbst. `OrbitControls` bleibt ausschließlich als Kamera-Zielverwaltung für Ansichtswechsel und Einpassen bestehen, nimmt aber keine Browser-Mausereignisse mehr entgegen.
+
+- **Kamera-Modus (Standard):** Linke Taste halten und ziehen = um das Modell drehen. Rechte Taste oder Umschalt+linke Taste = verschieben. Mausrad = zoomen.
+- **Bauteil-Modus:** Schaltfläche `Kamera mit Maus drehen` anklicken; sie wechselt zu `Bauteil per Maus drehen`. Dann dreht linkes Ziehen die ausgewählten Teile oder ohne Auswahl das ganze Modell. Rückwechsel über dieselbe Schaltfläche. Die Rotation verändert den Mesh-Export (GLB, STL, OBJ), nicht die ursprüngliche STEP-Datei.
+- **Kamera-Drehtasten:** `↶ ↷ ↑ ↓` funktionieren unabhängig vom Mausmodus.
+- **Diagnose:** Schaltfläche `Diagnose` kopiert eine technische JSON-Zusammenfassung (Eingabezähler, Renderer-Frames, Kamera-Koordinaten und DOM-Treffer im Mittelpunkt). Der Bericht enthält keine hochgeladene CAD-Datei und keine Bauteilnamen. Falls die Oberfläche immer noch nicht reagiert, den Text in den Support-Chat einfügen.
+
+**Regression:** Verifizieren: Demo laden → im Kameramodus linke Maustaste ziehen → Rad-Zoom → Bauteilmodus einschalten → Modell im 3D-Feld ziehen → Bauteil im linken Baum auswählen → erneut ziehen. Danach mit einer STEP-Datei wiederholen. Die JS-Syntax und die Veröffentlichung wurden technisch geprüft; ein vollständiger reproduzierter Test im Edge-PWA-Fenster steht noch aus.
+
+PWA-ID und Scope bleiben `/cadview-studio/`. Der S-Parameter Analyzer wird nicht verändert. Bei alter Version Edge-Web-App schließen, normale Website mit `Strg+F5` aktualisieren und anschließend die App neu starten.
