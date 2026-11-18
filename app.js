@@ -328,6 +328,7 @@ function finalizeModel(title,sub){
     }
   },900);
   if(edgesEnabled)showEdges(true);
+  renderNow('model loaded');
 }
 function repositionGrid(){
   const b=contentBounds(modelRoot);
@@ -360,6 +361,7 @@ function fitToObject(o){
   controls.minDistance=Math.max(radius*.005,.00001);
   controls.maxDistance=Math.max(radius*100,10);
   controls.update();
+  renderNow('fit to model');
 }
 function setView(type){
   if(!modelRoot)return;
@@ -373,6 +375,7 @@ function setView(type){
   camera.lookAt(center);controls.update();
   document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===type));
   if($('inputFeedback'))$('inputFeedback').textContent=(language()==='en'?'View: ':'Ansicht: ')+type;
+  renderNow('view preset');
 }
 // Camera orbit only: these controls never change CAD geometry or exports.
 function orbitView(yawDegrees=0,pitchDegrees=0){
@@ -390,6 +393,7 @@ function orbitView(yawDegrees=0,pitchDegrees=0){
   camera.up.set(0,0,1);camera.position.copy(center).add(offset);camera.lookAt(center);controls.update();
   document.querySelectorAll('[data-view]').forEach(el=>el.classList.remove('active'));
   if($('inputFeedback'))$('inputFeedback').textContent=language()==='en'?'Free camera view':'Freie Kameransicht';
+  renderNow('orbit preset');
 }
 controls.addEventListener('start',()=>interactionSurface.classList.add('is-dragging'));
 controls.addEventListener('end',()=>interactionSurface.classList.remove('is-dragging'));
@@ -453,6 +457,7 @@ function applyMaterialPatch(patch){
       mat.needsUpdate=true;
     });
   });
+  renderNow('material edit');
 }
 function restoreMaterials(){
   if(!modelRoot)return;
@@ -760,9 +765,17 @@ function screenshot(){
   try{renderer.render(scene,camera);imageCanvas().toBlob(b=>{if(b)download(b,filenameStem()+'-ansicht.png');else toast('Screenshot fehlgeschlagen.',true)},'image/png')}
   catch(err){toast('Screenshot fehlgeschlagen: '+err.message,true)}
 }
-function resize(){const r=viewport.getBoundingClientRect();if(r.width<=0||r.height<=0)return;
-  renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
-new ResizeObserver(resize).observe(viewport);
+function resize(){
+  const r=viewport.getBoundingClientRect();
+  if(r.width<=0||r.height<=0)return false;
+  const w=Math.max(1,Math.round(r.width)),h=Math.max(1,Math.round(r.height));
+  const changed=renderer.getSize(new THREE.Vector2()).x!==w||renderer.getSize(new THREE.Vector2()).y!==h;
+  if(changed)renderer.setSize(w,h,false);
+  if(camera.aspect!==w/h){camera.aspect=w/h;camera.updateProjectionMatrix()}
+  if(changed)renderNow('viewport resize');
+  return true;
+}
+new ResizeObserver(()=>resize()).observe(viewport);
 // The core renderer MUST keep running even when a measurement/HUD widget fails.
 // v1.3 could leave an empty viewport after a nonessential frame exception.
 let lastRenderFailure = '';
@@ -770,6 +783,31 @@ let lastOverlayFailure = '';
 let wasContextLost = false;
 let recoveryAttempts = 0;
 let framesRendered = 0;
+let lastStartupFailure = '';
+let loopStarted = false;
+let lastRenderAt = 0;
+function renderNow(reason=''){
+  if(wasContextLost)return false;
+  if(!viewport.clientWidth||!viewport.clientHeight)return false;
+  try{
+    // An explicit redraw is essential after user input, as RAF can be suspended by
+    // an installed PWA window or if model initialization previously threw.
+    camera.updateMatrixWorld(true);
+    renderer.render(scene,camera);
+    framesRendered++;
+    lastRenderAt=performance.now();
+    if(lastRenderFailure){lastRenderFailure='';clearRenderNotice()}
+    return true;
+  }catch(error){
+    const message=String(error?.stack||error?.message||error);
+    if(message!==lastRenderFailure){
+      lastRenderFailure=message;
+      console.error('CADVIEW WebGL render failure',reason,error);
+      renderNotice('3D-Renderfehler: '+String(error?.message||error),true);
+    }
+    return false;
+  }
+}
 function renderNotice(message, isFatal=false){
   const panel=$('renderNotice'); if(!panel)return;
   panel.classList.remove('hidden');
@@ -777,8 +815,11 @@ function renderNotice(message, isFatal=false){
   panel.dataset.fatal=String(isFatal);
 }
 function clearRenderNotice(){ $('renderNotice')?.classList.add('hidden'); }
-interactionSurface.addEventListener('webglcontextlost',ev=>{ev.preventDefault();wasContextLost=true;renderNotice('Die 3D-Grafikverbindung wurde unterbrochen. Bitte Ansicht neu laden.',true)});
-interactionSurface.addEventListener('webglcontextrestored',()=>{wasContextLost=false;lastRenderFailure='';clearRenderNotice();resize();fitToObject(modelRoot)});
+canvas.addEventListener('webglcontextlost',ev=>{ev.preventDefault();wasContextLost=true;renderNotice('Die 3D-Grafikverbindung wurde unterbrochen. Bitte Ansicht neu laden.',true)});
+canvas.addEventListener('webglcontextrestored',()=>{
+  wasContextLost=false;lastRenderFailure='';clearRenderNotice();
+  resize();if(modelRoot)fitToObject(modelRoot);renderNow('WebGL context restored');
+});
 function recoverViewport(){
   if(!modelRoot)return;
   // Clear filters that can hide every part, without modifying the CAD data.
@@ -791,23 +832,14 @@ function recoverViewport(){
   if($('gridButton'))$('gridButton').classList.add('active');
   const dir=new THREE.Vector3(1,-1,.8).normalize();
   controls.target.set(0,0,0);camera.position.copy(dir.multiplyScalar(200));camera.up.set(0,0,1);
-  fitToObject(modelRoot);setView('iso');resize();updateTree();clearRenderNotice();
+  fitToObject(modelRoot);setView('iso');resize();updateTree();clearRenderNotice();renderNow('reset');
   if(wasContextLost) renderNotice('3D-Kontext verloren. Lade diese Seite mit Strg+F5 neu.',true);
   else toast(language()==='en'?'Model and camera reset.':'Modell und Kamera zurückgesetzt.');
 }
 function animate(){
   requestAnimationFrame(animate);
-  if(wasContextLost)return;
-  try{
-    controls.update();
-    // Core render comes FIRST: a faulty overlay can no longer blank the viewport.
-    renderer.render(scene,camera);framesRendered++;
-    lastRenderFailure='';
-  }catch(error){
-    const description=String(error?.message||error);
-    if(description!==lastRenderFailure){lastRenderFailure=description;console.error('CADVIEW render failure',error);renderNotice('3D-Renderfehler: '+description,true)}
-    return;
-  }
+  if(wasContextLost||document.hidden)return;
+  if(!renderNow('animation frame'))return;
   try{
     refreshSelectionBox();updateOrientationWidget();updateMeasurementScale();
     lastOverlayFailure='';
@@ -816,6 +848,25 @@ function animate(){
     if(description!==lastOverlayFailure){lastOverlayFailure=description;console.warn('CADVIEW HUD failure (3D continues)',error)}
   }
 }
+function startRenderLoop(){
+  if(loopStarted)return;
+  loopStarted=true;
+  // Start BEFORE loading the demo: a failed demo initializer must never kill the renderer.
+  animate();
+}
+function restoreAfterWindowChange(reason){
+  // Edge PWA: after minimize / restore the canvas drawing buffer may be discarded.
+  if(document.hidden)return;
+  resize();
+  renderNow(reason);
+  // Some GPU backends restore their swap chain one task later.
+  requestAnimationFrame(()=>{resize();renderNow(reason+' next frame')});
+}
+for(const eventName of ['pageshow','focus','resize']){
+  window.addEventListener(eventName,()=>restoreAfterWindowChange(eventName));
+}
+document.addEventListener('visibilitychange',()=>restoreAfterWindowChange('visibility restored'));
+
 window.addEventListener('keydown',e=>{
   if(e.defaultPrevented||e.ctrlKey||e.metaKey||e.altKey||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)||$('helpDialog')?.open)return;
   if(e.key==='0'){e.preventDefault();recoverViewport()}
@@ -857,6 +908,7 @@ function rotateActive(axis,angle,silent=false){
   else stepGlobalTransform.premultiply(worldTransform);
   modelRoot.updateWorldMatrix(true,true);
   refreshSelectionBox();updateDimensions();updateSection();repositionGrid();
+  renderNow('geometry rotation');
   if(!silent)toast(`Rotation ${angle}° um ${axis.toUpperCase()} angewendet – Export berücksichtigt neue Ausrichtung.`);
 }
 function nHasAncestor(n,possibleParent){for(let p=n.parent;p;p=p.parent)if(p===possibleParent)return true;return false}
@@ -1467,6 +1519,7 @@ function cameraOrbitPixels(dx,dy){
   camera.position.copy(controls.target).add(offset);
   camera.lookAt(controls.target);controls.update();
   pointerDiagnostics.orbits++;
+  renderNow('pointer orbit');
 }
 function cameraPanPixels(dx,dy){
   camera.updateMatrixWorld(true);
@@ -1478,6 +1531,7 @@ function cameraPanPixels(dx,dy){
   const move=right.multiplyScalar(-dx*factor).add(up.multiplyScalar(dy*factor));
   camera.position.add(move);controls.target.add(move);controls.update();
   pointerDiagnostics.pans++;
+  renderNow('pointer pan');
 }
 function cameraZoomDelta(dy){
   if(!modelRoot)return;
@@ -1487,6 +1541,7 @@ function cameraZoomDelta(dy){
   if(distance<1e-8)return;
   camera.position.copy(controls.target).addScaledVector(offset,zoomed/distance);
   controls.update();pointerDiagnostics.zooms++;
+  renderNow('wheel zoom');
 }
 function syncInteractionMode(){
   const button=$('interactionModeToggle');if(!button)return;
@@ -1555,9 +1610,14 @@ interactionSurface.addEventListener('wheel',e=>{
 $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   const rect=interactionSurface.getBoundingClientRect();
   const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
-  const report={version:'1.4.2',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
+  const report={version:'1.4.3',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
     size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
-    mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,
+    mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,
+    lastRenderFailure:lastRenderFailure.slice(0,900),lastStartupFailure:lastStartupFailure.slice(0,900),
+    lastRenderAgeMs:lastRenderAt?Math.round(performance.now()-lastRenderAt):null,
+    webglContextLost:renderer.getContext().isContextLost(),
+    renderCalls:renderer.info.render.calls,renderTriangles:renderer.info.render.triangles,
+    pageVisibility:document.visibilityState,
     camera:camera.position.toArray().map(v=>Number(v.toFixed(3))),
     target:controls.target.toArray().map(v=>Number(v.toFixed(3)))};
   const textReport=JSON.stringify(report,null,2);
@@ -1652,4 +1712,15 @@ initializePWA();
 setupHelpAndLocalization();
 loadRotationPresets();
 setLightTheme((()=>{try{return localStorage.getItem('cadview-theme')==='light'}catch{return false}})());
-createDemo();resize();animate();
+// The render loop must survive initialization failures and continue updating the canvas.
+startRenderLoop();
+try{
+  createDemo();
+  resize();
+  renderNow('startup complete');
+}catch(error){
+  lastStartupFailure=String(error?.stack||error?.message||error);
+  console.error('CADVIEW startup exception',error);
+  renderNotice('Initialisierung unvollständig: '+String(error?.message||error),true);
+  resize();renderNow('startup recovery');
+}
