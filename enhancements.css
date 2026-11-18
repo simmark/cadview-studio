@@ -1,0 +1,32 @@
+
+/* CADVIEW 1.3 · UX, keyboard guide, measurement, coordinate system */
+.lang-control{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;border:1px solid var(--line);border-radius:7px;padding:4px 7px;white-space:nowrap}
+.lang-control select{border:0;background:transparent;color:var(--text);font:inherit;font-weight:800;cursor:pointer;outline-offset:4px}
+.lang-control select option{color:#162333;background:#fff}
+.axis-widget{bottom:38px;left:13px;gap:0;z-index:8;pointer-events:none;min-width:104px;min-height:117px;align-items:center}
+#orientationCanvas{width:108px;height:108px;display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.17))}
+.axis-title{color:var(--muted);letter-spacing:1px;font-weight:650;font-size:9px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 5px;line-height:1}
+.measure-buttons{display:flex;gap:8px}.measure-buttons .panel-action{flex:1}
+.watermark-choice{display:flex;align-items:center;gap:9px;font-size:11px;margin:10px 0;color:var(--text);cursor:pointer}.watermark-choice input{accent-color:var(--cyan)}
+.snap-legend{line-height:1.6}
+.snap-marker{position:absolute;width:13px;height:13px;transform:translate(-50%,-50%);border:2px solid #0daea8;z-index:9;pointer-events:none;box-shadow:0 0 0 2px #fff9;background:#f6fffd}
+.snap-marker[data-kind="vertex"]{border-radius:1px}
+.snap-marker[data-kind="edge"]{border-radius:2px;height:6px;width:14px}
+.snap-marker[data-kind="midpoint"]{border-radius:50% 50% 0 0}
+.snap-marker[data-kind="quarter"]{border-radius:0 100% 0 0}
+.snap-marker[data-kind="faceCenter"]{border-radius:50%;background:#0daea8;border:3px solid #fff}
+.snap-marker[data-kind="surface"]{border-radius:50%;width:7px;height:7px}
+.measure-label{top:12px;left:50%;white-space:normal;max-width:min(74vw,530px);padding:5px 9px;font-size:10px;opacity:.92;line-height:1.5;text-align:center}
+.help-dialog{position:fixed;inset:0 auto auto 0;top:50%;left:50%;transform:translate(-50%,-50%);z-index:130;width:min(790px,calc(100vw - 30px));max-height:min(85dvh,820px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;color:var(--text);box-shadow:0 22px 90px rgba(0,0,0,.46);padding:22px 25px}
+.help-dialog::backdrop{background:rgba(4,15,28,.7);backdrop-filter:blur(3px)}
+.help-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.help-head h2{font-size:21px;margin:5px 0 0}.help-head .eyebrow{font-size:10px;color:var(--cyan);letter-spacing:1.3px}.help-close{background:var(--soft);color:var(--text);border:1px solid var(--line);border-radius:8px;font-size:25px;line-height:1;width:34px;height:34px}
+.help-dialog p{font-size:12px;line-height:1.6;color:var(--muted)}.shortcut-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:1px;margin:19px 0;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.shortcut-item{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:9px 3px;border-bottom:1px solid var(--line);font-size:11px}.shortcut-item:nth-last-child(-n+2){border:0}
+.shortcut-item kbd,.viewport-hint kbd{background:var(--soft);color:var(--text);border:1px solid var(--line);padding:2px 5px;border-radius:4px;font-size:11px;font-family:inherit;white-space:nowrap;font-weight:750}.shortcut-item span{color:var(--text)}
+.help-option{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:11px}.help-option input{accent-color:var(--cyan)}.help-actions{display:flex;justify-content:flex-end}.help-actions .panel-action{width:auto;padding:8px 24px}
+:root[data-theme="light"] .help-dialog{background:#fbfdff;color:#233746}.axis-widget .axis-title{letter-spacing:.5px}
+@media(max-width:850px){.help-dialog{padding:18px}.shortcut-grid{grid-template-columns:1fr}.shortcut-item:nth-last-child(-n+2){border-bottom:1px solid var(--line)}}
+@media(max-width:670px){.axis-widget{bottom:13px;left:4px;transform:scale(.8);transform-origin:left bottom}.measure-label{top:6px;max-width:94vw}.lang-control{padding:3px}.lang-control span{display:none}.help-dialog{max-height:92dvh}}
+
+.axis-mode{pointer-events:auto;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:4px;padding:3px 9px;font-size:10px;font-weight:750;margin-bottom:1px}
+.axis-mode:hover{border-color:var(--cyan)}
