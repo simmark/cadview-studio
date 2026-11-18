@@ -32,14 +32,15 @@ assert.ok(app.includes('window.launchQueue.setConsumer('),'OS file launch consum
 assert.ok(app.includes('await loadFile(file)'),'File launch must reuse local CAD importer');
 assert.ok(app.includes('MEASURE_DRAG_THRESHOLD'),'Measurement mode click/drag threshold missing');
 assert.ok(app.includes("!measuring || (d.moved>MEASURE_DRAG_THRESHOLD)"),'Measurement drag must orbit camera');
-for(const id of ['measureLabelSize','measureSnapSize','measureLabelStyle','measureLabelSizeValue','measureSnapSizeValue']){
-  assert.ok(ids.has(id),'Measurement appearance control missing: '+id);
-}
 assert.ok(app.includes('function setupMeasurementAppearance()'),'Measurement preferences setup missing');
 assert.ok(app.includes('cadview-measure-appearance-v1'),'Measurement local storage key missing');
 
 
 const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
+for(const id of ['measureLabelSize','measureSnapSize','measureLabelStyle','measureLabelSizeValue','measureSnapSizeValue']){
+  assert.ok(ids.has(id),'Measurement appearance control missing: '+id);
+}
+
 const refs = new Set([...app.matchAll(/\$\('([^']+)'\)/g), ...gui.matchAll(/\$\('([^']+)'\)/g)].map(m=>m[1]));
 const missing = [...refs].filter(id=>!ids.has(id));
 assert.deepEqual(missing, [], 'UI references missing in index.html');
