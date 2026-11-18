@@ -430,6 +430,8 @@ function selectNode(node, multi=false){
   $('partCategory').value=count===1?(selected.category||'Sonstige'):'';
   updateMaterialControls();updateDimensions();
   if($('inputFeedback')&&count>0)$('inputFeedback').textContent=language()==='en'?`${count} part(s) selected`:`${count} Bauteil(e) ausgewählt`;
+  // SelectionBox3, tree clicks and raycast picks must become visible immediately.
+  renderNow('selection changed');
 }
 function selectedPartNodes(){return [...selectedNodes];}
 function getTargetMeshes(){
@@ -862,9 +864,11 @@ function animate(){
 function startRenderLoop(){
   if(loopStarted)return;
   loopStarted=true;
-  // Start BEFORE loading the demo: a failed demo initializer must never kill the renderer.
   animate();
 }
+// Start BEFORE all optional UI setup. Bad saved presets, blocked storage or
+// localization failures must never prevent the viewport from updating.
+startRenderLoop();
 function restoreAfterWindowChange(reason){
   // Edge PWA: after minimize / restore the canvas drawing buffer may be discarded.
   if(document.hidden)return;
@@ -938,7 +942,17 @@ function saveRotationPreset(){
   toast('Drehvorlage „'+name+'“ gespeichert.');
 }
 function loadRotationPresets(){
-  const presets=JSON.parse(localStorage.getItem('cadview-rotations')||'{}');
+  // A malformed/blocked localStorage entry must not abort the entire viewer.
+  let presets={};
+  try{
+    const stored=localStorage.getItem('cadview-rotations');
+    if(stored){
+      const parsed=JSON.parse(stored);
+      if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))presets=parsed;
+    }
+  }catch(error){
+    console.warn('CADVIEW: saved rotation templates unavailable, continuing',error);
+  }
   const select=$('rotationPresetList');select.replaceChildren(new Option('Vorlage auswählen …',''));
   for(const name of Object.keys(presets))select.add(new Option(name,name));
 }
@@ -1504,6 +1518,7 @@ function setupHelpAndLocalization(){
       if(!selectedNodes.size)return toast(language()==='en'?'Select a part first':'Bitte zuerst ein Bauteil auswählen.');
       for(const node of selectedNodes)node.obj.visible=false;
       updateTree();updateDimensions();
+      renderNow('keyboard hide');
     }
     else if(action==='isolate')isolateSelection();
     else if(action==='measure')$('measureButton').click();
@@ -1634,7 +1649,7 @@ interactionSurface.addEventListener('wheel',e=>{
 $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   const rect=interactionSurface.getBoundingClientRect();
   const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
-  const report={version:'1.4.3',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
+  const report={version:'1.4.5',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
     size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
     mode:manipulationMode,events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,
     lastRenderFailure:lastRenderFailure.slice(0,900),lastStartupFailure:lastStartupFailure.slice(0,900),
@@ -1766,12 +1781,20 @@ interactionSurface.addEventListener('pointermove',e=>{if(!measuring)return;if(ca
 interactionSurface.addEventListener('pointerleave',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
 $('measureSnap').addEventListener('change',()=>{$('snapMarker').classList.add('hidden');snapPreview=null});
 $('installButton').addEventListener('click',promptInstallation);
-initializePWA();
-setupHelpAndLocalization();
-loadRotationPresets();
-setLightTheme((()=>{try{return localStorage.getItem('cadview-theme')==='light'}catch{return false}})());
-// The render loop must survive initialization failures and continue updating the canvas.
-startRenderLoop();
+// Independent initialization: individual PWA/localization/preset failures must not
+// prevent demo rendering or the already running animation loop.
+function safeStartup(name,fn){
+  try{fn()}catch(error){
+    const detail=String(error?.stack||error?.message||error);
+    lastStartupFailure+=(lastStartupFailure?'\n':'')+name+': '+detail;
+    console.error('CADVIEW startup: '+name,error);
+    // We can still use the model when nonessential UI setup fails.
+  }
+}
+safeStartup('PWA',initializePWA);
+safeStartup('help/localization',setupHelpAndLocalization);
+safeStartup('saved presets',loadRotationPresets);
+safeStartup('theme',()=>setLightTheme((()=>{try{return localStorage.getItem('cadview-theme')==='light'}catch{return false}})()));
 try{
   createDemo();
   resize();
