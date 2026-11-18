@@ -1,129 +1,130 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b121e" id="appThemeColor">
-  <meta name="application-name" content="CADVIEW Studio">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="CADVIEW">
-  <link rel="manifest" href="./manifest.webmanifest?v=1.3.0">
-  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png">
-  <meta name="description" content="CADVIEW Studio – STEP, IGES und 3D Modelle im Browser betrachten, Materialien zuweisen, Bauteile ausblenden und exportieren.">
-  <title>CADVIEW Studio — 3D CAD Viewer</title>
-  <link rel="stylesheet" href="./styles.css?v=1.2.0"><link rel="stylesheet" href="./enhancements.css?v=1.3.0">
-  <script type="importmap">
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+<meta content="#0b121e" id="appThemeColor" name="theme-color"/>
+<meta content="CADVIEW Studio" name="application-name"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="CADVIEW" name="apple-mobile-web-app-title"/>
+<link href="./manifest.webmanifest?v=1.3.0" rel="manifest"/>
+<link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
+<link href="./icons/icon-192.png" rel="apple-touch-icon"/>
+<meta content="CADVIEW Studio – STEP, IGES und 3D Modelle im Browser betrachten, Materialien zuweisen, Bauteile ausblenden und exportieren." name="description"/>
+<title>CADVIEW Studio — 3D CAD Viewer</title>
+<link href="./styles.css?v=1.2.0" rel="stylesheet"/><link href="./enhancements.css?v=1.3.0" rel="stylesheet"/>
+<script type="importmap">
   {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
   </script>
-</head>
+<link href="./rework.css?v=1.4.0" rel="stylesheet"/></head>
 <body>
 <div class="app">
-  <header class="topbar">
-    <div class="brand" aria-label="CADVIEW Studio"><span class="brand-mark"><span class="brand-cube">◇</span></span><span class="brand-name">CAD<span>VIEW</span></span><span class="brand-suffix">STUDIO</span><span class="brand-badge">BETA 1.3</span></div>
-    <div class="top-actions"><label class="lang-control" title="Sprache / Language"><span>🌐</span><select id="languageSelect" aria-label="Sprache / Language"><option value="de">DE</option><option value="en">EN</option></select></label>
-      <button type="button" class="top-btn primary" id="openButton"><span class="b-icon">↥</span> Modell öffnen</button>
-      <button type="button" class="top-btn" id="demoButton" title="Beispielbaugruppe anzeigen">Demo</button><button type="button" class="top-btn" id="themeButton" title="Helles/Dunkles Design umschalten">☀ Hell</button><button type="button" class="top-btn" id="installButton" title="CADVIEW als App installieren">⊞ Installieren</button>
-      <div class="top-sep"></div>
-      <button type="button" class="top-btn" id="screenshotButton" title="3D-Ansicht als PNG speichern">▧ <span class="hide-small">Screenshot</span></button>
-      <div class="dropdown-anchor">
-        <button type="button" class="top-btn export-main" id="exportButton" aria-expanded="false">Exportieren <span class="tiny-caret">⌄</span></button>
-        <div class="export-menu hidden" id="exportMenu">
-          <div class="export-select"><label for="exportGrouping">GLB-Struktur</label><select id="exportGrouping"><option value="original">Originale Baugruppe</option><option value="category">Nach Kategorien</option><option value="material">Nach Materialien</option><option value="category-material">Kategorie → Material</option></select></div><button data-export="glb"><strong>GLB</strong><span>3D-Modell mit gruppierten Materialien</span></button>
-          <button data-export="stl"><strong>STL</strong><span>Geometrie für 3D-Druck</span></button>
-          <button data-export="obj"><strong>OBJ</strong><span>Geometrie ohne MTL-Datei</span></button><button data-export="step"><strong>STEP (Original)</strong><span>Unveränderte CAD-Datei; Dreh-Export noch nicht verfügbar</span></button><button data-export="project"><strong>Projekt JSON</strong><span>Rotationen, Kategorien, Materialien, Maße</span></button>
-        </div>
-      </div>
-      <button type="button" class="top-btn help-link" id="helpButton" title="Hilfe und Tastenkürzel / Help and shortcuts">? Hilfe</button>
-    </div>
-  </header>
-  <div class="workspace">
-    <aside class="sidebar sidebar-left" id="leftSidebar">
-      <div class="sidebar-title"><div><span class="eyebrow">PROJEKT</span><h2>Modellstruktur</h2></div><button type="button" class="icon-button mobile-close" id="closeLeft" title="Schließen">×</button></div>
-      <div class="file-card" id="fileCard"><span class="file-icon">▣</span><div class="file-text"><strong id="fileName">Demo · Präzisionsbaugruppe</strong><span id="fileMeta">6 Komponenten · Demo</span></div><span class="online-indicator"></span></div>
-      <div class="section-top"><span>BAUTEILE</span><span class="count-pill" id="partCount">6</span></div>
-      <div class="tree-tools"><input id="treeSearch" type="search" autocomplete="off" placeholder="Bauteile suchen …" aria-label="Bauteile suchen"><button type="button" id="showAllButton" title="Alle Teile sichtbar machen">◉</button><button type="button" id="hideAllButton" title="Alle Teile ausblenden">◌</button></div>
-      <p class="tree-help">Mehrfachauswahl: Strg-Klick, Umschalt-Klick oder Strg im 3D-Modell.</p><div class="tree-scroll" id="treeScroll"><div id="assemblyTree" class="assembly-tree" aria-label="Baugruppenstruktur"></div></div>
-      <div class="left-bottom">
-        <div class="section-top"><span>SCHNELLZUGRIFF</span></div>
-        <div class="quick-grid"><button id="fitButton" type="button"><span>⌗</span> Alles einpassen</button><button id="isolateButton" type="button"><span>◎</span> Isolieren</button><button id="resetVisibilityButton" type="button"><span>↺</span> Sichtbarkeit</button><button id="clearSelectionButton" type="button"><span>×</span> Auswahl aufheben</button></div>
-        <div class="privacy-note"><span>♧</span><div><strong>Lokal im Browser</strong><span>Deine CAD-Datei wird nicht auf einen Server hochgeladen.</span></div></div>
-      </div>
-    </aside>
-    <main class="viewport-shell" id="viewportShell">
-      <div class="viewport-toolbar"><div class="view-toggle"><button type="button" class="active" data-view="iso">3D</button><button type="button" data-view="top">Oben</button><button type="button" data-view="front">Vorne</button><button type="button" data-view="right">Rechts</button><button type="button" data-view="left">Links</button><button type="button" data-view="back">Hinten</button><button type="button" data-view="bottom">Unten</button></div><div class="toolbar-right"><button type="button" class="toolbar-btn" id="wireframeButton" aria-pressed="false" title="Kanten anzeigen">▤ <span>Kanten</span></button><button type="button" class="toolbar-btn" id="measureButton" aria-pressed="false" title="Zwei Punkte auf dem Modell anklicken">⌁ <span>Messen</span></button><button type="button" class="toolbar-btn" id="sectionButton" aria-pressed="false" title="Schnitt durch Modell">◩ <span>Schnitt</span></button><button type="button" class="toolbar-btn" id="dimensionButton" title="Abmessungen der Auswahl anzeigen">▤ <span>Bemaßung</span></button><button type="button" class="toolbar-btn" id="renderButton" title="Studio-Rendering">✦ <span>Studio</span></button><button type="button" class="toolbar-btn" id="undoMeasureButton" title="Letzte Messung rückgängig / Undo measurement">↶ <span>Rückgängig</span></button><button type="button" class="toolbar-btn" id="toggleMeasuresButton" aria-pressed="true" title="Maße ein- oder ausblenden">◉ <span>Maße</span></button><button type="button" class="toolbar-btn" id="gridButton" aria-pressed="true" title="Raster ein-/ausblenden">▦ <span>Raster</span></button></div></div>
-      <div id="canvasArea" class="canvas-area" role="region" aria-label="Interaktiver 3D Viewer"><canvas id="cadCanvas"></canvas><div class="axis-widget" aria-label="Drehbares Weltkoordinatensystem X Y Z"><button type="button" class="axis-mode" id="axisModeButton" title="Weltachsen / Teilachsen">Welt</button><canvas id="orientationCanvas" width="200" height="200" aria-hidden="true"></canvas><div class="axis-title" id="axisHint">WELTACHSEN · XYZ</div></div><div id="snapMarker" class="snap-marker hidden" aria-hidden="true"></div>
-        <div class="empty-overlay hidden" id="emptyOverlay"><span class="empty-glyph">◇</span><h2>Dein Modell beginnt hier.</h2><p>Ziehe eine STEP-, IGES-, STL-, OBJ- oder GLB-Datei in dieses Fenster.</p><button type="button" id="emptyOpen" class="top-btn primary">Datei auswählen</button></div>
-        <div id="dropOverlay" class="drop-overlay hidden"><div class="drop-inner"><span>↥</span><h2>3D-Modell ablegen</h2><p>STEP · IGES · STL · OBJ · GLB · GLTF · BREP</p></div></div>
-        <div class="loading-overlay hidden" id="loadingOverlay"><div class="loader"></div><strong id="loadingText">CAD-Datei wird eingelesen …</strong><p id="loadingDetail">Bei komplexen STEP-Baugruppen kann das einen Moment dauern.</p></div>
-        <div class="measure-label hidden" id="measureLabel"></div>
-        <div class="viewport-hint" id="viewportHint">Drehen: links · Zoomen: Rad · Verschieben: rechts · <kbd>?</kbd> Tastenkürzel</div>
-      </div>
-      <div class="viewport-bottom"><div class="status-left"><span class="status-dot"></span><span id="statusText">Bereit – Demo geladen</span><span class="status-divider">|</span><span id="meshInfo">6 Bauteile</span></div><div class="status-right"><span id="unitText">Einheit: mm</span><span class="status-divider">|</span><span id="trisInfo">— Dreiecke</span></div></div>
-    </main>
-    <aside class="sidebar sidebar-right" id="rightSidebar">
-      <div class="sidebar-title right-title"><div><span class="eyebrow">EIGENSCHAFTEN</span><h2>Inspektor</h2></div><button type="button" class="icon-button mobile-close" id="closeRight" title="Schließen">×</button></div>
-      <div class="right-scroll">
-        <div class="inspector-head"><span class="mini-preview">◇</span><div><strong id="selectedName">Kein Bauteil ausgewählt</strong><span id="selectedInfo">Modell oder Bauteil anklicken</span></div></div>
-        <div class="panel-divider"></div>
-        <div class="panel-label-row"><span>MATERIAL & FARBE</span><button type="button" class="text-button" id="resetMaterialButton" title="Ursprüngliche Materialien wiederherstellen">Zurücksetzen</button></div>
-        <label for="materialPreset" class="field-label">Material-Vorlage</label>
-        <select id="materialPreset"><option value="original">Original aus CAD</option><option value="aluminium">Aluminium · satiniert</option><option value="steel">Edelstahl · gebürstet</option><option value="chrome">Chrom · glänzend</option><option value="copper">Kupfer</option><option value="brass">Messing</option><option value="plastic">Kunststoff · matt</option><option value="rubber">Gummi · schwarz</option><option value="glass">Glas · transparent</option><option value="custom">Benutzerdefiniert</option></select>
-        <div class="color-field"><div><span class="field-label">Grundfarbe</span><span class="small-sub">Farbe des ausgewählten Bauteils</span></div><input type="color" id="materialColor" value="#8ca3b6" aria-label="Materialfarbe"></div>
-        <div class="range-row"><label for="metalnessRange">Metallisch</label><output id="metalnessValue">50 %</output></div><input type="range" id="metalnessRange" min="0" max="100" value="50">
-        <div class="range-row"><label for="roughnessRange">Rauheit</label><output id="roughnessValue">40 %</output></div><input type="range" id="roughnessRange" min="0" max="100" value="40">
-        <div class="range-row"><label for="opacityRange">Deckkraft</label><output id="opacityValue">100 %</output></div><input type="range" id="opacityRange" min="5" max="100" value="100">
-        <div class="panel-divider"></div>
-        <div class="panel-label-row"><span>TEILE & KATEGORIEN</span></div>
-        <label for="partCategory" class="field-label">Kategorie der Auswahl</label>
-        <input id="partCategory" type="text" list="categoryList" placeholder="z. B. Pins, Wicklung, Kern" autocomplete="off">
-        <datalist id="categoryList"><option value="Pins"><option value="Kontakte"><option value="Gehäuse"><option value="Kern"><option value="Wicklung"><option value="Isolation"><option value="Verguss"><option value="Sonstige"></datalist>
-        <button type="button" class="panel-action" id="applyCategoryButton">Kategorie für Auswahl übernehmen</button>
-        <p class="dimension-note">Material und Kategorie können für mehrere Teile gleichzeitig gesetzt werden. Beim GLB-Export als separate Gruppen nutzbar.</p>
-        <div class="panel-divider"></div>
-        <div class="panel-label-row"><span>AUSRICHTUNG & ROTATION</span></div>
-        <div class="field-grid"><label>Achse<select id="rotationAxis"><option value="x">X-Achse</option><option value="y">Y-Achse</option><option value="z" selected>Z-Achse</option></select></label><label>Winkel (°)<input type="number" id="rotationAngle" value="90" step="1" min="-360" max="360"></label></div>
-        <div class="button-row"><button type="button" class="panel-action" id="rotateNegative">↶ -Winkel</button><button type="button" class="panel-action" id="rotatePositive">↷ +Winkel</button><button type="button" class="panel-action" id="rotate180">↻ 180°</button></div>
-        <p class="dimension-note">Dreht ausgewählte Bauteile gemeinsam um ihre Mitte – ohne Auswahl das gesamte Modell. Die Drehung verändert den Export.</p>
-        <div class="field-grid"><label>Eigene Drehvorlage<input type="text" id="rotationPresetName" placeholder="z. B. Pins nach oben"></label><label>Gespeichert<select id="rotationPresetList"><option value="">Vorlage auswählen …</option></select></label></div>
-        <div class="button-row"><button id="saveRotationPreset" class="panel-action" type="button">Vorlage sichern</button><button id="applyRotationPreset" class="panel-action" type="button">Anwenden</button></div>
-        <div class="button-row"><button id="saveProjectButton" class="panel-action primary-action" type="button">Projekt speichern</button><button id="loadProjectButton" class="panel-action" type="button">Projekt öffnen</button></div>
-        <div class="panel-divider"></div>
-        <div class="panel-label-row"><span>DARSTELLUNG</span></div>
-        <div class="control-item"><div><strong>Explosionsansicht</strong><span>Bauteile auseinanderziehen</span></div><output id="explodeValue">0 %</output></div><input type="range" id="explodeRange" min="0" max="100" value="0">
-        <div class="control-item section-control"><div><strong>Schnittebene 1</strong><span>Achse und Position auswählen</span></div><output id="sectionValue">0 %</output></div>
-        <div class="field-grid"><label>Achse<select id="sectionAxis"><option value="z">XY / Höhe Z</option><option value="x">YZ / X</option><option value="y">XZ / Y</option><option value="custom">Freier Normalvektor</option></select></label><label class="compact-check">Umkehren<input type="checkbox" id="sectionInvert"></label></div>
-        <div id="customNormalFields" class="field-grid hidden"><label>nx<input id="sectionNx" type="number" value="0" step="0.1"></label><label>ny<input id="sectionNy" type="number" value="0" step="0.1"></label><label>nz<input id="sectionNz" type="number" value="1" step="0.1"></label></div>
-        <input type="range" id="sectionRange" min="-100" max="100" value="0" disabled>
-        <div class="control-item"><div><strong>Zweite Schnittebene</strong><span>Zusätzlicher Schnitt</span></div><label class="switch"><input type="checkbox" id="section2Toggle"><span></span></label></div>
-        <div class="field-grid"><label>Achse<select id="section2Axis"><option value="x">YZ / X</option><option value="y">XZ / Y</option><option value="z">XY / Z</option></select></label><label class="compact-check">Umkehren<input type="checkbox" id="section2Invert"></label></div><input type="range" id="section2Range" min="-100" max="100" value="0" disabled>
-        <div class="control-item" style="margin-top:13px"><div><strong>Transparenzmodus</strong><span>Alle Bauteile durchscheinend</span></div><label class="switch"><input type="checkbox" id="xrayToggle"><span></span></label></div>
-        <div class="control-item"><div><strong>Hintergrund</strong><span>Heller oder dunkler Viewport</span></div><label class="switch"><input type="checkbox" id="lightBackgroundToggle"><span></span></label></div><div class="control-item"><div><strong>Studio-Materialrendering</strong><span>Reflexionen und realistischere Metalle</span></div><label class="switch"><input type="checkbox" id="studioToggle"><span></span></label></div><button id="highResScreenshot" class="panel-action" type="button">Renderbild als PNG (2×) speichern</button><label class="watermark-choice"><input type="checkbox" id="watermarkToggle" checked> Wasserzeichen: CADVIEW by Simonlation</label>
-        <div class="panel-divider"></div>
-        <div class="panel-label-row"><span>ABMESSUNGEN</span><span class="unit-tag" id="inspectorUnit">mm</span></div>
-        <div class="dimensions"><div><span>Breite · X</span><strong id="dimX">—</strong></div><div><span>Tiefe · Y</span><strong id="dimY">—</strong></div><div><span>Höhe · Z</span><strong id="dimZ">—</strong></div></div>
-        <p class="dimension-note" id="dimensionNote">Abmessungen der Auswahl (oder des gesamten Modells). Angezeigte Maße entsprechen den importierten Koordinaten.</p>
-        <button class="panel-action" type="button" id="measureBoundsButton">Breite · Tiefe · Höhe einzeichnen</button>
-        <div class="field-grid"><label>Messpunkt-Fang<select id="measureSnap"><option value="auto">Automatisch · magnetisch</option><option value="vertex">Ecke □</option><option value="edge">Kante ━</option><option value="midpoint">Kantenmitte ◐</option><option value="quarter">Viertelpunkt ◔</option><option value="faceCenter">Flächenmitte ◉ (Mesh)</option><option value="surface">Freier Flächenpunkt</option></select></label><label>Maßeinheit<select id="measureUnits"><option value="original">Original</option><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="inch">Zoll</option></select></label></div>
-        <div class="panel-label-row" style="margin-top:10px"><span>MESSUNGEN</span><button class="text-button" id="clearAllMeasurements" type="button">Alle löschen</button></div><div class="measure-buttons"><button class="panel-action" type="button" id="undoLastMeasurement">↶ Rückgängig</button><button class="panel-action" type="button" id="toggleMeasurementVisibility" aria-pressed="true">◉ Maße ausblenden</button></div><p class="dimension-note snap-legend">□ Ecke · ◐ Kantenmitte · ◔ Viertelpunkt · ◉ Flächenmitte. <strong>Alt</strong> = Fang vorübergehend aus. Dreiecksnetze: angenäherte Punkte.</p>
-        <div id="measurementList" class="measurement-list"><p class="dimension-note">Zwei Punkte im 3D-Modell auswählen oder automatische Bemaßung hinzufügen.</p></div>
-        <p class="dimension-note">Ecken- und Kantenfang basieren auf Dreiecksnetzen. Das ist keine analytische CAD-Kantenmessung. Schnitte sind visuell und verändern die Datei nicht.</p>
-      </div>
-    </aside>
-  </div>
-  <footer class="mobile-bottom-bar"><button id="mobileTree" type="button">☷ Bauteile</button><button id="mobileOpen" type="button">↥ Öffnen</button><button id="mobileProperties" type="button">⚙ Material</button></footer>
+<header class="topbar">
+<div aria-label="CADVIEW Studio" class="brand"><span class="brand-mark"><span class="brand-cube">◇</span></span><span class="brand-name">CAD<span>VIEW</span></span><span class="brand-suffix">STUDIO</span><span class="brand-badge">BETA 1.4</span></div>
+<div class="top-actions"><label class="lang-control" title="Sprache / Language"><span>🌐</span><select aria-label="Sprache / Language" id="languageSelect"><option value="de">DE</option><option value="en">EN</option></select></label>
+<button class="top-btn primary" id="openButton" type="button"><span class="b-icon">↥</span> Modell öffnen</button>
+<button class="top-btn" id="demoButton" title="Beispielbaugruppe anzeigen" type="button">Demo</button><button class="top-btn" id="themeButton" title="Helles/Dunkles Design umschalten" type="button">☀ Hell</button><button class="top-btn" id="installButton" title="CADVIEW als App installieren" type="button">⊞ Installieren</button>
+<div class="top-sep"></div>
+<button class="top-btn" id="screenshotButton" title="3D-Ansicht als PNG speichern" type="button">▧ <span class="hide-small">Screenshot</span></button>
+<div class="dropdown-anchor">
+<button aria-expanded="false" class="top-btn export-main" id="exportButton" type="button">Exportieren <span class="tiny-caret">⌄</span></button>
+<div class="export-menu hidden" id="exportMenu">
+<div class="export-select"><label for="exportGrouping">GLB-Struktur</label><select id="exportGrouping"><option value="original">Originale Baugruppe</option><option value="category">Nach Kategorien</option><option value="material">Nach Materialien</option><option value="category-material">Kategorie → Material</option></select></div><button data-export="glb"><strong>GLB</strong><span>3D-Modell mit gruppierten Materialien</span></button>
+<button data-export="stl"><strong>STL</strong><span>Geometrie für 3D-Druck</span></button>
+<button data-export="obj"><strong>OBJ</strong><span>Geometrie ohne MTL-Datei</span></button><button data-export="step"><strong>STEP (Original)</strong><span>Unveränderte CAD-Datei; Dreh-Export noch nicht verfügbar</span></button><button data-export="project"><strong>Projekt JSON</strong><span>Rotationen, Kategorien, Materialien, Maße</span></button>
 </div>
-<input id="projectInput" class="sr-only" type="file" accept=".json,application/json">
-<input id="fileInput" class="sr-only" type="file" accept=".step,.stp,.iges,.igs,.brep,.stl,.obj,.glb,.gltf">
-<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-<dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
-  <div class="help-head"><div><span class="eyebrow">CADVIEW STUDIO · GUIDE</span><h2 id="helpTitle">Steuerung & Tastenkürzel</h2></div><button class="help-close" id="helpClose" type="button" aria-label="Schließen">×</button></div>
-  <p id="helpIntro">Drehen: linke Maustaste · Verschieben: rechte Maustaste · Zoomen: Mausrad. Mit Strg-Klick mehrere Teile auswählen.</p>
-  <div class="shortcut-grid" id="shortcutGrid"></div>
-  <p class="help-foot" id="helpDisclaimer">Messfang arbeitet auf gerenderten Dreiecksnetzen. Mesh-Ecken sind nicht zwingend geometrische CAD-Ecken. Die X/Y/Z-Anzeige zeigt die festen Weltachsen relativ zur aktuellen Kamerarichtung.</p>
-  <label class="help-option"><input type="checkbox" id="skipOnboarding" checked> Diese Hilfe beim Start nicht erneut anzeigen</label>
-  <div class="help-actions"><button type="button" id="helpConfirm" class="panel-action primary-action">Verstanden</button></div>
+</div>
+<button class="top-btn help-link" id="helpButton" title="Hilfe und Tastenkürzel / Help and shortcuts" type="button">? Hilfe</button>
+</div>
+</header>
+<div class="workspace">
+<aside class="sidebar sidebar-left" id="leftSidebar">
+<div class="sidebar-title"><div><span class="eyebrow">PROJEKT</span><h2>Modellstruktur</h2></div><button class="icon-button mobile-close" id="closeLeft" title="Schließen" type="button">×</button></div>
+<div class="file-card" id="fileCard"><span class="file-icon">▣</span><div class="file-text"><strong id="fileName">Demo · Präzisionsbaugruppe</strong><span id="fileMeta">6 Komponenten · Demo</span></div><span class="online-indicator"></span></div>
+<div class="section-top"><span>BAUTEILE</span><span class="count-pill" id="partCount">6</span></div>
+<div class="tree-tools"><input aria-label="Bauteile suchen" autocomplete="off" id="treeSearch" placeholder="Bauteile suchen …" type="search"/><button id="showAllButton" title="Alle Teile sichtbar machen" type="button">◉</button><button id="hideAllButton" title="Alle Teile ausblenden" type="button">◌</button></div>
+<p class="tree-help">Mehrfachauswahl: Strg-Klick, Umschalt-Klick oder Strg im 3D-Modell.</p><div class="tree-scroll" id="treeScroll"><div aria-label="Baugruppenstruktur" class="assembly-tree" id="assemblyTree"></div></div>
+<div class="left-bottom">
+<div class="section-top"><span>SCHNELLZUGRIFF</span></div>
+<div class="quick-grid"><button id="fitButton" type="button"><span>⌗</span> Alles einpassen</button><button id="isolateButton" type="button"><span>◎</span> Isolieren</button><button id="resetVisibilityButton" type="button"><span>↺</span> Sichtbarkeit</button><button id="clearSelectionButton" type="button"><span>×</span> Auswahl aufheben</button></div>
+<div class="privacy-note"><span>♧</span><div><strong>Lokal im Browser</strong><span>Deine CAD-Datei wird nicht auf einen Server hochgeladen.</span></div></div>
+</div>
+</aside>
+<main class="viewport-shell" id="viewportShell">
+<div class="viewport-toolbar"><div class="view-toggle"><button class="active" data-view="iso" type="button">3D</button><button data-view="top" type="button">Oben</button><button data-view="front" type="button">Vorne</button><button data-view="right" type="button">Rechts</button><button data-view="left" type="button">Links</button><button data-view="back" type="button">Hinten</button><button data-view="bottom" type="button">Unten</button></div><button class="viewport-reset" id="viewportReset" title="Ansicht zurücksetzen (0)" type="button">⟲ Einpassen</button><div class="toolbar-right"><button aria-pressed="false" class="toolbar-btn" id="wireframeButton" title="Kanten anzeigen" type="button">▤ <span>Kanten</span></button><button aria-pressed="false" class="toolbar-btn" id="measureButton" title="Zwei Punkte auf dem Modell anklicken" type="button">⌁ <span>Messen</span></button><button aria-pressed="false" class="toolbar-btn" id="sectionButton" title="Schnitt durch Modell" type="button">◩ <span>Schnitt</span></button><button class="toolbar-btn" id="dimensionButton" title="Abmessungen der Auswahl anzeigen" type="button">▤ <span>Bemaßung</span></button><button class="toolbar-btn" id="renderButton" title="Studio-Rendering" type="button">✦ <span>Studio</span></button><button class="toolbar-btn" id="undoMeasureButton" title="Letzte Messung rückgängig / Undo measurement" type="button">↶ <span>Rückgängig</span></button><button aria-pressed="true" class="toolbar-btn" id="toggleMeasuresButton" title="Maße ein- oder ausblenden" type="button">◉ <span>Maße</span></button><button aria-pressed="true" class="toolbar-btn" id="gridButton" title="Raster ein-/ausblenden" type="button">▦ <span>Raster</span></button></div></div>
+<div aria-label="Interaktiver 3D Viewer" class="canvas-area" id="canvasArea" role="region"><canvas id="cadCanvas"></canvas><div class="render-notice hidden" id="renderNotice" role="alert"><span id="renderNoticeText">3D-Ansicht konnte nicht dargestellt werden.</span><button id="renderRecover" type="button">Ansicht zurücksetzen</button></div><div class="welcome-tips hidden" id="welcomeTips"><div class="welcome-label">CADVIEW STUDIO · QUICK START</div><strong id="welcomeTitle">Dein 3D-Arbeitsplatz</strong><p id="welcomeDescription">Modell öffnen oder Demo testen. Mit der Maus drehen und zoomen. <kbd>0</kbd> setzt die Ansicht zurück.</p><div class="welcome-actions"><button id="welcomeDemo" type="button">Demo testen</button><button id="welcomeHelp" type="button">Steuerung anzeigen</button><button aria-label="Hinweis schließen" id="welcomeDismiss" type="button">✕</button></div></div><div aria-label="Drehbares Weltkoordinatensystem X Y Z" class="axis-widget"><button class="axis-mode" id="axisModeButton" title="Weltachsen / Teilachsen" type="button">Welt</button><canvas aria-hidden="true" height="200" id="orientationCanvas" width="200"></canvas><div class="axis-title" id="axisHint">WELTACHSEN · XYZ</div></div><div aria-hidden="true" class="snap-marker hidden" id="snapMarker"></div>
+<div class="empty-overlay hidden" id="emptyOverlay"><span class="empty-glyph">◇</span><h2>Dein Modell beginnt hier.</h2><p>Ziehe eine STEP-, IGES-, STL-, OBJ- oder GLB-Datei in dieses Fenster.</p><button class="top-btn primary" id="emptyOpen" type="button">Datei auswählen</button></div>
+<div class="drop-overlay hidden" id="dropOverlay"><div class="drop-inner"><span>↥</span><h2>3D-Modell ablegen</h2><p>STEP · IGES · STL · OBJ · GLB · GLTF · BREP</p></div></div>
+<div class="loading-overlay hidden" id="loadingOverlay"><div class="loader"></div><strong id="loadingText">CAD-Datei wird eingelesen …</strong><p id="loadingDetail">Bei komplexen STEP-Baugruppen kann das einen Moment dauern.</p></div>
+<div class="measure-label hidden" id="measureLabel"></div>
+<div class="viewport-hint" id="viewportHint">Drehen: links · Zoomen: Rad · Verschieben: rechts · <kbd>?</kbd> Tastenkürzel</div>
+</div>
+<div class="viewport-bottom"><div class="status-left"><span class="status-dot"></span><span id="statusText">Bereit – Demo geladen</span><span class="status-divider">|</span><span id="meshInfo">6 Bauteile</span></div><div class="status-right"><span id="unitText">Einheit: mm</span><span class="status-divider">|</span><span id="trisInfo">— Dreiecke</span></div></div>
+</main>
+<aside class="sidebar sidebar-right" id="rightSidebar">
+<div class="sidebar-title right-title"><div><span class="eyebrow">EIGENSCHAFTEN</span><h2>Inspektor</h2></div><button class="icon-button mobile-close" id="closeRight" title="Schließen" type="button">×</button></div>
+<div class="right-scroll">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="inspector-head"><span class="mini-preview">◇</span><div><strong id="selectedName">Kein Bauteil ausgewählt</strong><span id="selectedInfo">Modell oder Bauteil anklicken</span></div></div><div class="inspector-subhead" id="inspectorDescription">Komponenten gezielt bearbeiten · Änderungen wirken auf die Auswahl.</div><div aria-label="Werkzeuge" class="inspector-tabs" id="inspectorTabs" role="tablist"><button aria-controls="panel-material" aria-selected="true" class="inspector-tab active" data-panel="material" role="tab" type="button">Material</button><button aria-controls="panel-transform" aria-selected="false" class="inspector-tab" data-panel="transform" role="tab" type="button">Ausrichten</button><button aria-controls="panel-section" aria-selected="false" class="inspector-tab" data-panel="section" role="tab" type="button">Schnitt</button><button aria-controls="panel-display" aria-selected="false" class="inspector-tab" data-panel="display" role="tab" type="button">Ansicht</button><button aria-controls="panel-measure" aria-selected="false" class="inspector-tab" data-panel="measure" role="tab" type="button">Messen</button></div><div class="inspector-content" id="inspectorContent"><section aria-label="Material" class="inspector-panel active" id="panel-material" role="tabpanel"><div class="panel-label-row"><span>MATERIAL &amp; FARBE</span><button class="text-button" id="resetMaterialButton" title="Ursprüngliche Materialien wiederherstellen" type="button">Zurücksetzen</button></div><label class="field-label" for="materialPreset">Material-Vorlage</label><select id="materialPreset"><option value="original">Original aus CAD</option><option value="aluminium">Aluminium · satiniert</option><option value="steel">Edelstahl · gebürstet</option><option value="chrome">Chrom · glänzend</option><option value="copper">Kupfer</option><option value="brass">Messing</option><option value="plastic">Kunststoff · matt</option><option value="rubber">Gummi · schwarz</option><option value="glass">Glas · transparent</option><option value="custom">Benutzerdefiniert</option></select><div class="color-field"><div><span class="field-label">Grundfarbe</span><span class="small-sub">Farbe des ausgewählten Bauteils</span></div><input aria-label="Materialfarbe" id="materialColor" type="color" value="#8ca3b6"/></div><div class="range-row"><label for="metalnessRange">Metallisch</label><output id="metalnessValue">50 %</output></div><input id="metalnessRange" max="100" min="0" type="range" value="50"/><div class="range-row"><label for="roughnessRange">Rauheit</label><output id="roughnessValue">40 %</output></div><input id="roughnessRange" max="100" min="0" type="range" value="40"/><div class="range-row"><label for="opacityRange">Deckkraft</label><output id="opacityValue">100 %</output></div><input id="opacityRange" max="100" min="5" type="range" value="100"/><div class="panel-label-row"><span>TEILE &amp; KATEGORIEN</span></div><label class="field-label" for="partCategory">Kategorie der Auswahl</label><input autocomplete="off" id="partCategory" list="categoryList" placeholder="z. B. Pins, Wicklung, Kern" type="text"/><datalist id="categoryList"><option value="Pins"><option value="Kontakte"><option value="Gehäuse"><option value="Kern"><option value="Wicklung"><option value="Isolation"><option value="Verguss"><option value="Sonstige"></option></option></option></option></option></option></option></option></datalist><button class="panel-action" id="applyCategoryButton" type="button">Kategorie für Auswahl übernehmen</button><p class="dimension-note">Material und Kategorie können für mehrere Teile gleichzeitig gesetzt werden. Beim GLB-Export als separate Gruppen nutzbar.</p></section><section aria-label="Ausrichten" class="inspector-panel" id="panel-transform" role="tabpanel"><div class="panel-label-row"><span>AUSRICHTUNG &amp; ROTATION</span></div><div class="field-grid"><label>Achse<select id="rotationAxis"><option value="x">X-Achse</option><option value="y">Y-Achse</option><option selected="" value="z">Z-Achse</option></select></label><label>Winkel (°)<input id="rotationAngle" max="360" min="-360" step="1" type="number" value="90"/></label></div><div class="button-row"><button class="panel-action" id="rotateNegative" type="button">↶ -Winkel</button><button class="panel-action" id="rotatePositive" type="button">↷ +Winkel</button><button class="panel-action" id="rotate180" type="button">↻ 180°</button></div><p class="dimension-note">Dreht ausgewählte Bauteile gemeinsam um ihre Mitte – ohne Auswahl das gesamte Modell. Die Drehung verändert den Export.</p><div class="field-grid"><label>Eigene Drehvorlage<input id="rotationPresetName" placeholder="z. B. Pins nach oben" type="text"/></label><label>Gespeichert<select id="rotationPresetList"><option value="">Vorlage auswählen …</option></select></label></div><div class="button-row"><button class="panel-action" id="saveRotationPreset" type="button">Vorlage sichern</button><button class="panel-action" id="applyRotationPreset" type="button">Anwenden</button></div><div class="button-row"><button class="panel-action primary-action" id="saveProjectButton" type="button">Projekt speichern</button><button class="panel-action" id="loadProjectButton" type="button">Projekt öffnen</button></div></section><section aria-label="Schnitt" class="inspector-panel" id="panel-section" role="tabpanel"><div class="control-item section-control"><div><strong>Schnittebene 1</strong><span>Achse und Position auswählen</span></div><output id="sectionValue">0 %</output></div><div class="field-grid"><label>Achse<select id="sectionAxis"><option value="z">XY / Höhe Z</option><option value="x">YZ / X</option><option value="y">XZ / Y</option><option value="custom">Freier Normalvektor</option></select></label><label class="compact-check">Umkehren<input id="sectionInvert" type="checkbox"/></label></div><div class="field-grid hidden" id="customNormalFields"><label>nx<input id="sectionNx" step="0.1" type="number" value="0"/></label><label>ny<input id="sectionNy" step="0.1" type="number" value="0"/></label><label>nz<input id="sectionNz" step="0.1" type="number" value="1"/></label></div><input disabled="" id="sectionRange" max="100" min="-100" type="range" value="0"/><div class="control-item"><div><strong>Zweite Schnittebene</strong><span>Zusätzlicher Schnitt</span></div><label class="switch"><input id="section2Toggle" type="checkbox"/><span></span></label></div><div class="field-grid"><label>Achse<select id="section2Axis"><option value="x">YZ / X</option><option value="y">XZ / Y</option><option value="z">XY / Z</option></select></label><label class="compact-check">Umkehren<input id="section2Invert" type="checkbox"/></label></div><input disabled="" id="section2Range" max="100" min="-100" type="range" value="0"/></section><section aria-label="Ansicht" class="inspector-panel" id="panel-display" role="tabpanel"><div class="panel-label-row"><span>DARSTELLUNG</span></div><div class="control-item"><div><strong>Explosionsansicht</strong><span>Bauteile auseinanderziehen</span></div><output id="explodeValue">0 %</output></div><input id="explodeRange" max="100" min="0" type="range" value="0"/><div class="control-item" style="margin-top:13px"><div><strong>Transparenzmodus</strong><span>Alle Bauteile durchscheinend</span></div><label class="switch"><input id="xrayToggle" type="checkbox"/><span></span></label></div><div class="control-item"><div><strong>Hintergrund</strong><span>Heller oder dunkler Viewport</span></div><label class="switch"><input id="lightBackgroundToggle" type="checkbox"/><span></span></label></div><div class="control-item"><div><strong>Studio-Materialrendering</strong><span>Reflexionen und realistischere Metalle</span></div><label class="switch"><input id="studioToggle" type="checkbox"/><span></span></label></div><button class="panel-action" id="highResScreenshot" type="button">Renderbild als PNG (2×) speichern</button><label class="watermark-choice"><input checked="" id="watermarkToggle" type="checkbox"/> Wasserzeichen: CADVIEW by Simonlation</label></section><section aria-label="Messen" class="inspector-panel" id="panel-measure" role="tabpanel"><div class="panel-label-row"><span>ABMESSUNGEN</span><span class="unit-tag" id="inspectorUnit">mm</span></div><div class="dimensions"><div><span>Breite · X</span><strong id="dimX">—</strong></div><div><span>Tiefe · Y</span><strong id="dimY">—</strong></div><div><span>Höhe · Z</span><strong id="dimZ">—</strong></div></div><p class="dimension-note" id="dimensionNote">Abmessungen der Auswahl (oder des gesamten Modells). Angezeigte Maße entsprechen den importierten Koordinaten.</p><button class="panel-action" id="measureBoundsButton" type="button">Breite · Tiefe · Höhe einzeichnen</button><div class="field-grid"><label>Messpunkt-Fang<select id="measureSnap"><option value="auto">Automatisch · magnetisch</option><option value="vertex">Ecke □</option><option value="edge">Kante ━</option><option value="midpoint">Kantenmitte ◐</option><option value="quarter">Viertelpunkt ◔</option><option value="faceCenter">Flächenmitte ◉ (Mesh)</option><option value="surface">Freier Flächenpunkt</option></select></label><label>Maßeinheit<select id="measureUnits"><option value="original">Original</option><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="inch">Zoll</option></select></label></div><div class="panel-label-row" style="margin-top:10px"><span>MESSUNGEN</span><button class="text-button" id="clearAllMeasurements" type="button">Alle löschen</button></div><div class="measure-buttons"><button class="panel-action" id="undoLastMeasurement" type="button">↶ Rückgängig</button><button aria-pressed="true" class="panel-action" id="toggleMeasurementVisibility" type="button">◉ Maße ausblenden</button></div><p class="dimension-note snap-legend">□ Ecke · ◐ Kantenmitte · ◔ Viertelpunkt · ◉ Flächenmitte. <strong>Alt</strong> = Fang vorübergehend aus. Dreiecksnetze: angenäherte Punkte.</p><div class="measurement-list" id="measurementList"><p class="dimension-note">Zwei Punkte im 3D-Modell auswählen oder automatische Bemaßung hinzufügen.</p></div><p class="dimension-note">Ecken- und Kantenfang basieren auf Dreiecksnetzen. Das ist keine analytische CAD-Kantenmessung. Schnitte sind visuell und verändern die Datei nicht.</p></section></div></div>
+</aside>
+</div>
+<footer class="mobile-bottom-bar"><button id="mobileTree" type="button">☷ Bauteile</button><button id="mobileOpen" type="button">↥ Öffnen</button><button id="mobileProperties" type="button">⚙ Material</button></footer>
+</div>
+<input accept=".json,application/json" class="sr-only" id="projectInput" type="file"/>
+<input accept=".step,.stp,.iges,.igs,.brep,.stl,.obj,.glb,.gltf" class="sr-only" id="fileInput" type="file"/>
+<div aria-live="polite" class="toast hidden" id="toast" role="status"></div>
+<dialog aria-labelledby="helpTitle" class="help-dialog" id="helpDialog">
+<div class="help-head"><div><span class="eyebrow">CADVIEW STUDIO · GUIDE</span><h2 id="helpTitle">CADVIEW · Hilfe &amp; Bedienung</h2></div><button aria-label="Schließen" class="help-close" id="helpClose" type="button">×</button></div>
+<p id="helpIntro">Drehen: linke Maustaste · Verschieben: rechte Maustaste · Zoomen: Mausrad. Mit Strg-Klick mehrere Teile auswählen.</p>
+<div class="shortcut-grid" id="shortcutGrid"></div>
+<p class="help-foot" id="helpDisclaimer">Messfang arbeitet auf gerenderten Dreiecksnetzen. Mesh-Ecken sind nicht zwingend geometrische CAD-Ecken. Die X/Y/Z-Anzeige zeigt die festen Weltachsen relativ zur aktuellen Kamerarichtung.</p>
+<label class="help-option"><input checked="" id="skipOnboarding" type="checkbox"/> Diese Hilfe beim Start nicht erneut anzeigen</label>
+<div class="help-actions"><button class="panel-action primary-action" id="helpConfirm" type="button">Verstanden</button></div>
 </dialog>
-<script type="module" src="./app.js?v=1.3.0"></script>
-</body>
+<script src="./app.js?v=1.4.0" type="module"></script>
+<script defer src="./gui.js?v=1.4.0"></script></body>
 </html>
