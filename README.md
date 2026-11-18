@@ -195,3 +195,19 @@ PWA-ID und Scope bleiben `/cadview-studio/`. Der S-Parameter Analyzer wird nicht
 **Test in Edge:** Installation vollständig schließen → Website neu laden → Versionsbadge **BETA 1.4.3** prüfen → Demo bewegen, 3D / Oben / Links wechseln, einzelnes Teil rotieren, STEP öffnen, erneut bewegen → App minimieren/wiederherstellen → Diagnose öffnen. `renderFrames` muss dann über 0 liegen und ansteigen. Wenn es 0 bleibt, bitte die vollständige Diagnose sowie den Konsolenfehler senden.
 
 Die Korrektur ist im Repository überprüft; der vollständige GPU-/PWA-Livetest muss auf dem Zielgerät bestätigt werden.
+
+## Beta 1.4.4 – Live-Redraw, Messpunkte und Export-Menü
+
+Auf Basis der gemeldeten Edge-PWA-Probleme wurden die folgenden Bereiche gezielt überarbeitet:
+
+- **Live-Redraw:** Sichtbarkeit einzelner Bauteile, Alles ein-/ausblenden, Isolieren, Explosionsansicht, Schnittparameter, Kanten, Transparenzmodus, Material-Reset und Rasterwechsel zeichnen die Szene unmittelbar neu. Der Benutzer muss keine zusätzliche Kamerabewegung ausführen.
+- **Messungen:** Endmarker und Maßlabels werden bereits vor dem ersten Zeichnen auf Bildschirm-Pixelgrößen skaliert. Marker sind auf etwa 4–5 px Durchmesser reduziert. Gespeicherte Messungen behalten ihre Endpunkte, Linien und Labels auch nach dem nächsten Messvorgang; Vorschau- und gespeicherte Grafiken bleiben getrennt. Neue Messungen schalten die Maßdarstellung wieder ein.
+- **Mess-Vorschau:** Der Fangmarker ist kleiner und unterscheidet Eckpunkt, Kantenmitte, Viertelpunkt und Flächenmitte visuell. Die berechneten Punkte basieren weiterhin auf der Mesh-Näherung, nicht auf analytischen CAD-Kanten.
+- **Export-Popup:** Beim Öffnen wird das Menü in `document.body` verschoben, als festes Popover am Export-Button ausgerichtet und auf die verfügbare Fenstergröße begrenzt. Außenklick, Escape, Größenänderung und Scrollen werden berücksichtigt. Das Menü wird nicht mehr vom rechten Inspektor verdeckt.
+- **PWA:** App, CSS und Service-Worker-Cache verwenden Version `1.4.4`. Die PWA-ID `/cadview-studio/` bleibt unverändert. Andere Simonlation-Apps werden nicht geändert.
+
+### Qualitätssicherung
+
+- **Manuelles Testprotokoll:** [QA-TESTPROTOKOLL.md](./QA-TESTPROTOKOLL.md) mit 23 nachvollziehbaren Funktionsprüfungen und Freigaberegel.
+- **Automatische statische Prüfung:** `node tests/check-release.mjs`; GitHub-Workflow `.github/workflows/cadview-static-qa.yml`.
+- **Prüfstatus:** Quellcode- und DOM-Verknüpfungsprüfung bestanden. Ein vollständiger interaktiver WebGL-Test auf der installierten Edge-PWA ist **noch nicht bestätigt**. Die App nicht als vollständig regressionstested ausgeben, bevor die manuellen Fälle erledigt sind.
