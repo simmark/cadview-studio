@@ -16,14 +16,14 @@
     de:{
       note:'Komponenten gezielt bearbeiten · Änderungen wirken auf die Auswahl.',
       welcome:'Dein 3D-Arbeitsplatz',welcomeBody:'Modell öffnen oder Demo testen. Mit der Maus drehen und zoomen. Mit 0 die Ansicht zurücksetzen.',
-      demo:'Demo testen',help:'Steuerung anzeigen',reset:'⟲ Einpassen',recover:'Ansicht zurücksetzen',
+      demo:'Demo testen',help:'Steuerung anzeigen',reset:'Einpassen',recover:'Ansicht zurücksetzen',
       empty:'Keine 3D-Flächen sichtbar. Nutze „Einpassen“ oder „Demo testen“.',
       shortcut:'Ansicht 0: Kamera und Sichtbarkeit zurücksetzen.'
     },
     en:{
       note:'Edit selected parts · Changes apply to the current selection.',
       welcome:'Your 3D workspace',welcomeBody:'Open a CAD file or try the demo. Drag to orbit, scroll to zoom. Press 0 to reset the view.',
-      demo:'Try demo',help:'Controls & shortcuts',reset:'⟲ Fit view',recover:'Reset view',
+      demo:'Try demo',help:'Controls & shortcuts',reset:'Fit view',recover:'Reset view',
       empty:'No 3D surfaces visible. Use “Fit view” or “Try demo”.',
       shortcut:'View 0: Reset camera and component visibility.'
     }
@@ -82,7 +82,7 @@
     $('welcomeDescription').textContent=dict.welcomeBody;
     $('welcomeDemo').textContent=dict.demo;
     $('welcomeHelp').textContent=dict.help;
-    $('viewportReset').textContent=dict.reset;
+    $('viewportReset').innerHTML='<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg> '+dict.reset;
     $('renderRecover').textContent=dict.recover;
     // Leave the main translation logic in app.js as the only owner of standard labels.
   }

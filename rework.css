@@ -199,3 +199,28 @@ body > #exportMenu.export-menu [data-export]{position:relative;z-index:0}
 #snapMarker.snap-marker[data-kind="midpoint"]{border-radius:50% 50% 0 0}
 #snapMarker.snap-marker[data-kind="faceCenter"]{border-radius:50%;background:transparent;border-width:3px!important}
 #snapMarker.snap-marker[data-kind="surface"]{width:calc(var(--cad-snap-size,13px)*.7)!important;height:calc(var(--cad-snap-size,13px)*.7)!important;border-radius:50%}
+/* 1.5.0 · SIMONLATION brand alignment and consistent SVG icon set */
+.ico{width:16px;height:16px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+.brand{text-decoration:none;color:inherit}
+.brand-mark{display:inline-grid;place-items:center}
+.brand-ico{width:22px;height:22px;stroke:var(--cyan);stroke-width:1.7}
+.brand-stack{display:flex;flex-direction:column;line-height:1.05}
+.brand-stack .brand-name{font-size:18px;letter-spacing:.2px}
+.brand-stack .brand-suffix{font-size:9px;letter-spacing:2px;opacity:.8;margin-top:2px}
+.top-btn .ico,.toolbar-btn .ico,.viewport-reset .ico{margin-right:1px}
+#themeButton,#installButton{display:inline-flex;align-items:center;justify-content:center;min-width:38px}
+#themeButton .ico,#installButton .ico{width:17px;height:17px}
+#installButton.installed{color:var(--cyan)}
+.lang-control{display:inline-flex;align-items:center;gap:6px}
+.lang-control .ico{width:15px;height:15px;opacity:.8}
+.camera-tools button{display:inline-grid;place-items:center}
+.camera-tools .ico{width:15px;height:15px}
+.tree-tools button,.tree-eye{display:inline-grid;place-items:center}
+.tree-tools .ico{width:16px;height:16px}
+.tree-eye .ico{width:13px;height:13px}
+.quick-grid button>span .ico,.privacy-note>span .ico{width:15px;height:15px}
+.file-icon{display:inline-grid;place-items:center}
+.file-icon .ico{width:20px;height:20px}
+.b-icon .ico{width:16px;height:16px}
+.help-tools{display:flex;gap:10px;align-items:center;margin:12px 0 4px}
+@media(max-width:670px){.brand-stack .brand-name{font-size:14px}.brand-stack .brand-suffix{font-size:7.5px;letter-spacing:1.4px}}

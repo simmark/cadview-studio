@@ -1,11 +1,30 @@
-/* CADVIEW Studio PWA. Same-origin shell cache; CDN resources cached opportunistically. */
-const VERSION = 'cadview-studio-1.4.6';
-const RUNTIME = 'cadview-deps-1.4.6';
+/* CADVIEW Studio PWA 1.5.0. Same-origin shell incl. bundled three.js; OCCT engine cached on first use; CDN only as fallback. */
+const VERSION = 'cadview-studio-1.5.0';
+const RUNTIME = 'cadview-deps-1.5.0';
 const APP_FILES = [
-  './','./index.html','./styles.css?v=1.2.0','./app.js?v=1.4.6',
-  './occt-worker.js?v=1.2.0','./manifest.webmanifest?v=1.4.6','./enhancements.css?v=1.3.0','./rework.css?v=1.4.6','./gui.js?v=1.4.1',
-  './icons/icon-192.png','./icons/icon-512.png','./README.md'
+  './',
+  './index.html',
+  './styles.css?v=1.2.0',
+  './enhancements.css?v=1.3.0',
+  './rework.css?v=1.5.0',
+  './app.js?v=1.5.0',
+  './gui.js?v=1.5.0',
+  './occt-worker.js?v=1.5.0',
+  './manifest.webmanifest?v=1.5.0',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './vendor/three/build/three.core.min.js',
+  './vendor/three/build/three.module.min.js',
+  './vendor/three/examples/jsm/controls/OrbitControls.js',
+  './vendor/three/examples/jsm/exporters/GLTFExporter.js',
+  './vendor/three/examples/jsm/exporters/OBJExporter.js',
+  './vendor/three/examples/jsm/exporters/STLExporter.js',
+  './vendor/three/examples/jsm/loaders/GLTFLoader.js',
+  './vendor/three/examples/jsm/loaders/OBJLoader.js',
+  './vendor/three/examples/jsm/loaders/STLLoader.js',
+  './vendor/three/examples/jsm/utils/BufferGeometryUtils.js'
 ];
+// The OpenCascade engine (vendor/occt-import-js, ~7.6 MB) is cached on first STEP/IGES import (runtime cache).
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(APP_FILES)).then(()=>self.skipWaiting()));
 });

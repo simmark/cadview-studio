@@ -3,7 +3,9 @@ let parserPromise = null;
 // 0.0.23 is the latest published npm release (0.0.24 exists only in the upstream git repository).
 // Both the JS loader and its matching WASM binary must come from the SAME version.
 const OCCT_VERSION = '0.0.23';
+// Bundled locally since 1.5.0 (offline-capable, no third-party request). CDNs remain as fallback only.
 const OCCT_CDNS = [
+  new URL('./vendor/occt-import-js/', self.location.href).href,
   `https://cdn.jsdelivr.net/npm/occt-import-js@${OCCT_VERSION}/dist/`,
   `https://unpkg.com/occt-import-js@${OCCT_VERSION}/dist/`
 ];

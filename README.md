@@ -2,7 +2,9 @@
 
 Eine statische, auf **GitHub Pages** ausführbare 3D-Web-App zum Betrachten von STEP/IGES-Dateien, zur Baugruppeninspektion, zum Ein-/Ausblenden einzelner Komponenten sowie zur Materialgestaltung und zum Export in Mesh-Formate.
 
-Die Anwendung benötigt **kein Backend, keinen Account und keinen API-Schlüssel**. CAD-Dateien werden vom Browser verarbeitet und **nicht an einen eigenen Server hochgeladen**. Wichtig: Die JavaScript-Bibliotheken und die WebAssembly-CAD-Engine werden über die öffentlichen CDNs `cdn.jsdelivr.net` (mit `unpkg.com` als Fallback für die CAD-Engine) nachgeladen, insbesondere beim ersten STEP-/IGES-Import. Zum Öffnen muss daher eine Internetverbindung bestehen. Die ausgewählte CAD-Datei selbst wird an das CDN **nicht** hochgeladen.
+Die Anwendung benötigt **kein Backend, keinen Account und keinen API-Schlüssel**. CAD-Dateien werden im Browser verarbeitet und **nicht hochgeladen**. Seit 1.5.0 liegen three.js (r180) und die OpenCascade-WebAssembly-Engine (occt-import-js 0.0.23) **im Repository unter `vendor/`**. Die App lädt dadurch keine Drittanbieter-Ressourcen mehr und funktioniert nach dem ersten Aufruf auch offline; die CAD-Engine (~7,6 MB) wird beim ersten STEP/IGES-Import zwischengespeichert. jsDelivr/unpkg dienen nur noch als Rückfallebene, falls die lokale Engine nicht geladen werden kann.
+
+Lizenzen der eingebundenen Bibliotheken: `vendor/three/LICENSE` (MIT), `vendor/occt-import-js/license.occt-import-js.txt` und `license.occt.txt` (LGPL-2.1 mit OCCT-Ausnahme).
 
 ## Direkt auf GitHub Pages veröffentlichen
 
@@ -22,7 +24,7 @@ Im entpackten Projektordner in einer Konsole:
 python -m http.server 8000
 ```
 
-Dann `http://localhost:8000/` im Browser öffnen. Auch hier ist zum ersten Start eine Internetverbindung für die CDN-Bibliotheken erforderlich.
+Dann `http://localhost:8000/` im Browser öffnen. Seit 1.5.0 ist dafür keine Internetverbindung mehr nötig.
 
 ## Unterstützte Formate
 
@@ -229,6 +231,15 @@ Korrekturen in Beta 1.4.5:
 ### Freigabe
 
 Nach dem Laden muss `BETA 1.4.5` im Header erscheinen. Ohne jede Mausbewegung muss `animationTicks` nach kurzer Zeit steigen. Auswahl einer Baugruppe/Komponente und **H** müssen sofort sichtbar reagieren. Die präzisen Browser-Testfälle stehen in `QA-TESTPROTOKOLL.md` (QA-05, QA-24, QA-25); der Chromium-Smoke-Test prüft Auswahl, H und die autonome Render-Schleife. **Code/Syntax geprüft, vollständiger Edge-PWA-Livetest noch offen.**
+
+## Version 1.5.0 – offline, eindeutige Maße, SIMONLATION-Branding
+
+- **Fehlerkorrektur:** Die Lokalisierung brach beim Start mit `cadOriginalaria-label` ab (ungültiger dataset-Schlüssel). Dadurch war u. a. die Tastenkürzel-Liste in der Hilfe leer, und der Fehler wiederholte sich bei jeder Aktualisierung.
+- **Offline / Datenschutz:** three.js und die CAD-Engine liegen lokal unter `vendor/`; keine Anfragen an CDNs im Normalbetrieb.
+- **Eindeutige Maße:** Technische Werte ohne Tausenderpunkt (ein 1000-mm-Würfel wurde bisher als „1.000 mm“ angezeigt).
+- **Oberfläche:** einheitlicher SVG-Iconsatz statt Unicode-Zeichen, SIMONLATION-Markenkopf, Hell/Dunkel und Installieren als Icon-Buttons, „Diagnose“ in die Hilfe verschoben, „Messung zurück“ statt mehrdeutigem „Rückgängig“, ergänzte englische Beschriftungen.
+- Veraltete, nicht verlinkte Kopie von Stackup Studio (`/stackup-studio/`) entfernt – sie enthielt einen fehlerhaften Stripline-Rechenkern. Stackup Studio liegt unter https://simmark.github.io/stackup-studio/.
+- Release-Prüfung (`tests/check-release.mjs`) um Regressionsprüfungen für diese Punkte erweitert.
 
 ## Beta 1.4.6 – Messmodus, lesbare Bemaßungen und Windows-Dateizuordnung
 

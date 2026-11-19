@@ -36,6 +36,12 @@ assert.ok(app.includes('function setupMeasurementAppearance()'),'Measurement pre
 assert.ok(app.includes('cadview-measure-appearance-v1'),'Measurement local storage key missing');
 
 
+// 1.5.0 regression guards
+assert.ok(!app.includes("const key='cadOriginal'+attr;"),'dataset keys built from attribute names must be camel-cased (aria-label)');
+assert.ok(!html.includes('cdn.jsdelivr.net'),'three.js must be served from ./vendor (offline, no third-party request)');
+assert.ok(read('occt-worker.js').includes("new URL('./vendor/occt-import-js/'"),'OCCT engine must load from ./vendor first');
+assert.ok(app.includes('useGrouping:false'),'Engineering values must not use thousands separators (1.000 mm ambiguity)');
+
 const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
 for(const id of ['measureLabelSize','measureSnapSize','measureLabelStyle','measureLabelSizeValue','measureSnapSizeValue']){
   assert.ok(ids.has(id),'Measurement appearance control missing: '+id);

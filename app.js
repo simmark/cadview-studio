@@ -480,7 +480,7 @@ function restoreMaterials(){
 function updateDimensions(){
   const b=selectionBounds();
   const size=b.getSize(new THREE.Vector3());
-  const formatter=n=>Number.isFinite(n)?n.toLocaleString('de-DE',{maximumFractionDigits:2})+' '+(currentUnit==='Einheiten'?'':currentUnit):'—';
+  const formatter=n=>Number.isFinite(n)?n.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:2,useGrouping:false})+' '+(currentUnit==='Einheiten'?'':currentUnit):'—';
   $('dimX').textContent=b.isEmpty()?'—':formatter(size.x);
   $('dimY').textContent=b.isEmpty()?'—':formatter(size.y);
   $('dimZ').textContent=b.isEmpty()?'—':formatter(size.z);
@@ -498,7 +498,7 @@ function updateTree(){
     if(!nodeVisible(node))row.classList.add('dimmed');
     const indent=document.createElement('span');indent.className='tree-indent';indent.style.setProperty('--indent',Math.min(depth,15)*13+'px');row.append(indent);
     const arrow=document.createElement('button');arrow.className='tree-arrow'+(node.children.length?'':' empty');arrow.textContent=node.collapsed&&!term?'▸':'▾';arrow.title='Bauteile ein-/ausklappen';arrow.addEventListener('click',e=>{e.stopPropagation();node.collapsed=!node.collapsed;updateTree()});row.append(arrow);
-    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.textContent=nodeVisible(node)?'◉':'◌';eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions();refreshSelectionBox();renderNow('single part visibility changed')});row.append(eye);
+    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.innerHTML=nodeVisible(node)?'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>':'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6"/></svg>';eye.setAttribute('aria-label',nodeVisible(node)?'Ausblenden':'Einblenden');eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions();refreshSelectionBox();renderNow('single part visibility changed')});row.append(eye);
     const icon=document.createElement('span');icon.className='tree-symbol'+(node.isPart?' mesh':'');icon.textContent=node.isPart?'⬡':'▤';row.append(icon);
     const name=document.createElement('span');name.className='tree-name';name.textContent=node.obj.name||'Unbenannt';name.title=node.obj.name;row.append(name);
     row.addEventListener('click',e=>{
@@ -692,7 +692,7 @@ async function loadFile(file){
   finally{setLoading(false);$('fileInput').value='';}
 }
 async function parseWithWorker(file,format){
-  if(!worker){worker = new Worker('./occt-worker.js?v=1.2.0');worker.onerror = err=>{if(workerTask){workerTask.reject(new Error('CAD-Worker abgestürzt: '+(err.message||'Unbekannter Fehler')));workerTask=null}worker.terminate();worker=null};
+  if(!worker){worker = new Worker('./occt-worker.js?v=1.5.0');worker.onerror = err=>{if(workerTask){workerTask.reject(new Error('CAD-Worker abgestürzt: '+(err.message||'Unbekannter Fehler')));workerTask=null}worker.terminate();worker=null};
     worker.onmessage = e=>{const d=e.data;const task=workerTask;if(!task||task.id!==d.id)return;
       if(d.phase==='engine')setLoading(true,'CAD-Engine wird geladen …','Der OpenCascade-Parser wird beim ersten STEP/IGES-Import aus dem Internet geladen.');
       if(d.phase==='parsing')setLoading(true,'STEP/IGES wird konvertiert …','Die Originaldatei bleibt auf deinem Computer.');
@@ -1106,11 +1106,11 @@ function exportRotatedStep(){
 function formatMeasured(raw){
   let original=currentUnit==='mm'?'mm':currentUnit==='m'?'m':'Einheiten';
   const choice=$('measureUnits').value;
-  if(choice==='original'||original==='Einheiten')return raw.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3})+' '+original;
+  if(choice==='original'||original==='Einheiten')return raw.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3,useGrouping:false})+' '+original;
   const mm=original==='mm'?raw:raw*1000;
   const unit=choice;
   const value=unit==='mm'?mm:unit==='cm'?mm/10:unit==='m'?mm/1000:mm/25.4;
-  return value.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3})+' '+(unit==='inch'?'in':unit);
+  return value.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3,useGrouping:false})+' '+(unit==='inch'?'in':unit);
 }
 // Rendered onto a high-resolution texture and scaled to constant screen pixels.
 // Dark and light backgrounds both keep high contrast against CAD materials.
@@ -1371,7 +1371,7 @@ function setLightTheme(light){
   lightTheme=Boolean(light);lightBackground=lightTheme;
   document.documentElement.dataset.theme=lightTheme?'light':'dark';
   $('lightBackgroundToggle').checked=lightTheme;
-  $('themeButton').textContent=lightTheme?'☾ Dunkel':'☀ Hell';
+  {const tb=$('themeButton'),en=language()==='en';tb.classList.toggle('is-light',lightTheme);const deLabel=lightTheme?'Dunkles Design':'Helles Design',label=en?({'Helles Design':'Light theme','Dunkles Design':'Dark theme'})[deLabel]:deLabel;tb.dataset.cadOriginaltitle=deLabel;tb.dataset.cadOriginalariaLabel=deLabel;tb.title=label;tb.setAttribute('aria-label',label);}
   $('appThemeColor').content=lightTheme?'#f5f8fb':'#0b121e';
   scene.background=lightTheme?lightColor:darkColor;
   grid.material.opacity=lightTheme?.3:1;
@@ -1440,8 +1440,8 @@ function initializePWA(){
     navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Offline-Service-Worker:',e));
   }
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('installButton').title='Als Desktop- oder Mobil-App installieren'});
-  window.addEventListener('appinstalled',()=>{deferredInstall=null;$('installButton').textContent='✓ Installiert';toast('CADVIEW Studio wurde installiert.')});
-  if(window.matchMedia('(display-mode: standalone)').matches)$('installButton').textContent='✓ App';
+  window.addEventListener('appinstalled',()=>{deferredInstall=null;$('installButton').classList.add('installed');$('installButton').title='Installiert';toast('CADVIEW Studio wurde installiert.')});
+  if(window.matchMedia('(display-mode: standalone)').matches)$('installButton').classList.add('installed');
 }
 async function promptInstallation(){
   if(deferredInstall){const event=deferredInstall;deferredInstall=null;event.prompt();await event.userChoice;return}
@@ -1520,7 +1520,7 @@ const TRANSLATIONS={
  'Lokal im Browser':'Processed locally','Deine CAD-Datei wird nicht auf einen Server hochgeladen.':'Your CAD file is not uploaded to a server.',
  'Oben':'Top','Vorne':'Front','Rechts':'Right','Links':'Left','Hinten':'Back','Unten':'Bottom',
  'Kanten':'Edges','Messen':'Measure','Schnitt':'Section','Bemaßung':'Dimensions','Studio':'Studio','Raster':'Grid',
- 'Rückgängig':'Undo','Maße':'Dimensions','Maße ausblenden':'Hide dimensions','Maße einblenden':'Show dimensions',
+ 'Rückgängig':'Undo','Messung zurück':'Undo measure','Teil 90°':'Part 90°','Kamera mit Maus drehen':'Mouse orbits camera','Gesamtes Modell':'Whole model','Kein einzelnes Bauteil ausgewählt':'No single part selected','Ziehen dreht die Kamera':'Drag orbits the camera','Helles Design':'Light theme','Dunkles Design':'Dark theme','Alle Teile sichtbar machen':'Show all parts','Alle Teile ausblenden':'Hide all parts','CADVIEW als App installieren':'Install CADVIEW as an app','Kamera links drehen':'Orbit left','Kamera rechts drehen':'Orbit right','Kamera nach oben kippen':'Tilt up','Kamera nach unten kippen':'Tilt down','Diagnose kopieren':'Copy diagnostics','Maße':'Measures','Maße ausblenden':'Hide dimensions','Maße einblenden':'Show dimensions',
  'WELTACHSEN · XYZ':'WORLD AXES · XYZ',
  'Drehen: links · Zoomen: Rad · Verschieben: rechts ·':'Orbit: left · Zoom: wheel · Pan: right ·',
  'Tastenkürzel':'Shortcuts','Bereit – Demo geladen':'Ready – demo loaded','Einheit: mm':'Unit: mm',
@@ -1617,7 +1617,7 @@ function translateVisibleUI(){
   for(const el of root.querySelectorAll('[placeholder],[title],[aria-label]')){
     for(const attr of ['placeholder','title','aria-label']){
       if(!el.hasAttribute(attr))continue;
-      const key='cadOriginal'+attr;
+      const key='cadOriginal'+attr.replace(/-(\w)/g,(m,c)=>c.toUpperCase()); // dataset keys must not contain '-x'
       if(!el.dataset[key])el.dataset[key]=el.getAttribute(attr);
       const german=el.dataset[key];
       const desired=lang==='en'?(TRANSLATIONS[german]||german):german;
@@ -1804,7 +1804,7 @@ interactionSurface.addEventListener('wheel',e=>{
 $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   const rect=interactionSurface.getBoundingClientRect();
   const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
-  const report={version:'1.4.6',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
+  const report={version:'1.5.0',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
     size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
     mode:manipulationMode,measuring,measurementAppearance:{...measurementAppearance},events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,animationTicks,
     lastRenderFailure:lastRenderFailure.slice(0,900),lastStartupFailure:lastStartupFailure.slice(0,900),
