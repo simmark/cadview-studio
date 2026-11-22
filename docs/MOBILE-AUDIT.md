@@ -31,3 +31,20 @@ Die mobile Werkzeugleiste verwendet Navy #101e2a, Night #06121f, Mint #b7f0d4 un
 | Reale Freigabe | Android Chrome und Samsung Internet, iPhone Safari und Homescreen, Edge PWA. Gerät, OS/Browser, Datei, Richtung, beobachtetes Verhalten erfassen. Größere Baugruppe und thermischen Langzeittest lokal durchführen. |
 
 Kein Merge oder Deployment vor Gerätefreigabe. Manifest, Dateihandler, Projektschema und bestehende Speicherschlüssel beibehalten. Beim Arbeitsstand eigene versionierte Shell-Dateien konsistent cachen. Vor Release Update mit offenem Projekt und bereits gewärmter OCCT-Engine prüfen.
+
+## Bildvergleich mit der eingebauten Demo
+
+Gleicher Modellstand, frische Browserprofile, gleiche Fenstergrößen. Auf dem Smartphone überdeckten der automatisch geöffnete Inspektor, die Begrüßung und die Mauswerkzeuge die Baugruppe. Im neuen Startbild bleibt die Baugruppe vom Sockel bis zum Kern sichtbar. Die Schaltfläche „Bauteile“ öffnet den Baum, „Werkzeuge“ den Inspektor. Auf dem Desktop bleiben beide Seitenleisten sichtbar.
+
+| Ansicht | Beta 1.5.0 | Entwicklungsbranch |
+| --- | --- | --- |
+| Smartphone · 390 × 844 | ![Bisheriger Start mit offenem Inspektor](mobile/portrait-before.webp) | ![Modellfläche mit geschlossenen Sheets](mobile/portrait-after.webp) |
+| Querformat · 844 × 390 | [Screenshot](mobile/landscape-before.webp) | [Screenshot](mobile/landscape-after.webp) |
+| Tablet · 820 × 1180 | [Screenshot](mobile/tablet-before.webp) | [Screenshot](mobile/tablet-after.webp) |
+| Desktop · 1600 × 940 | [Screenshot](mobile/desktop-before.webp) | [Screenshot](mobile/desktop-after.webp) |
+
+Die Vergleichsbilder stammen aus Chromium/SwiftShader. Die beiden Läufe dokumentieren den Ausgangszustand und die erste Implementierung.
+
+- [Referenzlauf mit unverändertem Anwendungscode](https://github.com/simmark/cadview-studio/actions/runs/45020562571)
+- [Erster Lauf mit mobiler Oberfläche](https://github.com/simmark/cadview-studio/actions/runs/45020836257)
+- [WebGL, mobile Interaktion und Offline-STEP](https://github.com/simmark/cadview-studio/actions/runs/45020936509)
