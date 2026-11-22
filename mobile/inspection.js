@@ -1,4 +1,4 @@
-import {createGyro} from './gyro.js?v=m1';
+import {createGyro} from './gyro.js?v=m2';
 
 const messages = {
   off:['Gyro aus','Gyro off'], requesting:['Freigabe ausstehend','Awaiting permission'],
@@ -23,9 +23,10 @@ export function installInspection({camera,target,update,touch,closePanels}) {
     byId('gyroToggle').setAttribute('aria-pressed',String(enabled));
     byId('gyroCenter').disabled = sensor !== 'active';
   }
-  const gyro = createGyro({camera,target,update,touching:touch.touching,status(value){
+  const gyro = createGyro({camera,target,update,touching:()=>touch.touching() || !byId('partActions').hidden || Boolean(document.querySelector('.sidebar.open')),status(value){
     sensor=value; labels();
   }});
+  byId('gyroMode').addEventListener('change',()=>gyro.setMode(byId('gyroMode').value));
   function layout() {
     body.classList.toggle('inspection',compact.matches || immersive);
     body.classList.toggle('immersive',immersive);
@@ -77,7 +78,7 @@ export function installInspection({camera,target,update,touch,closePanels}) {
   byId('gyroCenter').addEventListener('click',gyro.recenter);
   document.addEventListener('keydown',event=>{
     if (event.key !== 'Escape' || byId('helpDialog').open || !byId('exportMenu').classList.contains('hidden')) return;
-    if (body.classList.contains('inspection') && document.querySelector('.sidebar.open')) {
+    if (body.classList.contains('inspection') && (document.querySelector('.sidebar.open') || !byId('partActions').hidden)) {
       closePanels();
     } else if (immersive) leave();
     else return;

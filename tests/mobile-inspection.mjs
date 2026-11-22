@@ -73,21 +73,25 @@ try {
     assert.ok(area.width>=width-2 && area.height>height*.6,'Free stage at '+width);
     assert.ok((await el('mobileFullscreen').boundingBox()).height>=44);
   }
-  await click('mobileTree');
+  await click('selectedPartChip');
   await click('touchMulti');
   const rows=page.locator('#assemblyTree .tree-name');
   await rows.nth(1).click();
   await rows.nth(2).click();
   assert.equal(await page.locator('#assemblyTree .selected').count(),2);
-  await click('isolateButton');
+  assert.equal(await el('partCaption').textContent(),'2 ausgewählt');
+  await click('partTools');
+  assert.equal(await el('leftSidebar').isVisible(),false);
+  await click('quickIsolate');
   assert.ok(await page.locator('#assemblyTree .dimmed').count()>0);
   await click('touchUndo');
   assert.equal(await page.locator('#assemblyTree .dimmed').count(),0);
   await click('touchHide');
   assert.ok(await page.locator('#assemblyTree .dimmed').count()>0);
-  await click('showAllButton');
+  await click('quickShowAll');
+  await click('selectedPartChip');
   await click('touchMulti');
-  await click('closeLeft');
+  await click('selectedPartChip');
   console.log('PASS layouts, multi-select, isolate, hide, undo and show all');
 
   const area=await box(), x=Math.round(area.x+area.width*.5),y=Math.round(area.y+area.height*.5);
@@ -115,7 +119,7 @@ try {
   await page.touchscreen.tap(picked,y);
   assert.ok(await el('selectedPartChip').isVisible(),'Tap on the model shows its name');
   await el('languageSelect').selectOption('en');
-  assert.equal(await el('mobileProperties').innerText(),'Tools');
+  assert.equal(await el('mobileProperties').innerText(),'Inspector');
   await click('mobileProperties'); await click('touchTheme'); await click('closeRight');
   assert.equal(await page.evaluate(()=>window.permissionCalls),0);
 
@@ -155,6 +159,15 @@ try {
   assert.notDeepEqual(zoomed.target,recentered.target);
   assert.equal(await el('gyroToggle').getAttribute('aria-pressed'),'true');
   await tilt(82); assert.deepEqual((await diag()).camera,zoomed.camera);
+  await click('partTools');
+  await el('gyroMode').selectOption('look');
+  await tilt(20);
+  assert.deepEqual((await diag()).camera,zoomed.camera);
+  await click('partTools');
+  await tilt(40); await tilt(53); await page.waitForTimeout(600);
+  const looked=await diag();
+  assert.deepEqual(looked.camera,zoomed.camera);
+  assert.notDeepEqual(looked.target,zoomed.target);
   await page.setViewportSize({width:844,height:390});
   await click('exitInspection');
   assert.deepEqual((await diag()).camera,zoomed.camera);
@@ -189,9 +202,9 @@ try {
     }
     const count=await importStep();
     await click('mobileFullscreen');
-    await click('mobileTree');
-    await rows.nth(1).click();
     await click('selectedPartChip');
+    await rows.nth(1).click();
+    await click('partTools');
     await click('touchHide');
     await click('touchUndo');
     await click('touchFocus');

@@ -1,5 +1,5 @@
 /* CADVIEW Studio PWA 1.5.0. Same-origin shell incl. bundled three.js; OCCT engine cached on first use; CDN only as fallback. */
-const VERSION = 'cadview-studio-mobile-m1';
+const VERSION = 'cadview-studio-mobile-m2';
 const RUNTIME = 'cadview-deps-1.5.0';
 const APP_FILES = [
   './',
@@ -7,12 +7,12 @@ const APP_FILES = [
   './styles.css?v=1.2.0',
   './enhancements.css?v=1.3.0',
   './rework.css?v=1.5.0',
-  './app.js?v=m1',
-  './gui.js?v=m1',
-  './mobile/inspection.js?v=m1',
-  './mobile/touch.js?v=m1',
-  './mobile/gyro.js?v=m1',
-  './mobile/inspection.css?v=m1',
+  './app.js?v=m2',
+  './gui.js?v=m2',
+  './mobile/inspection.js?v=m2',
+  './mobile/touch.js?v=m2',
+  './mobile/gyro.js?v=m2',
+  './mobile/inspection.css?v=m2',
   './occt-worker.js?v=1.5.0',
   './manifest.webmanifest?v=1.5.0',
   './icons/icon-192.png',

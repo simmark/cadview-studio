@@ -12,6 +12,7 @@ export function screenPose({alpha,beta,gamma}, angle) {
 
 export function createGyro({camera, target, update, status, touching}) {
   let generation = 0, requested = false, listening = false, timer, frame;
+  let mode = 'orbit';
   let reference, baseCamera, filtered, latest, lastAngle;
   function recenter() { reference = null; latest = null; filtered = null; }
   function detach() {
@@ -39,7 +40,8 @@ export function createGyro({camera, target, update, status, touching}) {
     const horizontal = Math.sqrt(1-z*z);
     direction.set(horizontal*Math.cos(azimuth),horizontal*Math.sin(azimuth),z);
     const radius = camera.position.distanceTo(target);
-    camera.position.copy(target).addScaledVector(direction,radius);
+    if (mode === 'look') target.copy(camera.position).addScaledVector(direction,-radius);
+    else camera.position.copy(target).addScaledVector(direction,radius);
     camera.up.set(0,0,1);
     camera.lookAt(target);
     update();
@@ -92,5 +94,5 @@ export function createGyro({camera, target, update, status, touching}) {
     else listen();
   });
   window.addEventListener('pagehide',()=>stop());
-  return {start,stop,recenter,isListening:()=>listening};
+  return {start,stop,recenter,setMode(value){mode=value;recenter();},isListening:()=>listening};
 }

@@ -7,8 +7,8 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
-import {installTouch} from './mobile/touch.js?v=m1';
-import {installInspection} from './mobile/inspection.js?v=m1';
+import {installTouch} from './mobile/touch.js?v=m2';
+import {installInspection} from './mobile/inspection.js?v=m2';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('cadCanvas');
@@ -423,6 +423,14 @@ function selectionBounds(){
   for(const n of selectedNodes)box.union(contentBounds(n.obj));
   return box;
 }
+function updatePartCaption(){
+  const english = language()==='en';
+  const count = selectedNodes.size;
+  const name = count === 1 ? selected.obj.name : count ? count + (english?' selected':' ausgewählt') : (english?'Model tree':'Modellbaum');
+  $('partCaption').textContent = name;
+  $('selectedPartChip').dataset.cadOriginaltitle = name;
+  $('selectedPartChip').title = name;
+}
 function selectNode(node, multi=false){
   if(!multi)selectedNodes.clear();
   if(node){
@@ -440,8 +448,8 @@ function selectNode(node, multi=false){
   document.querySelectorAll('.tree-node').forEach(el=>el.classList.toggle('selected',selectedNodes.has(allNodes.find(n=>String(n.id)===el.dataset.id))));
   const count=selectedNodes.size;
   $('selectedName').textContent=count===0?'Gesamtes Modell':count===1?selected.obj.name:`${count} Elemente ausgewählt`;
-  $('selectedPartChip').hidden = !count;
-  $('selectedPartChip').textContent = count === 1 ? selected.obj.name : String(count);
+  updatePartCaption();
+  $('quickIsolate').disabled = !count;
   $('touchHide').disabled = !count;
   $('touchFocus').disabled = !count;
   $('selectedInfo').textContent=count===0?'Kein einzelnes Bauteil ausgewählt':count>1?'Gemeinsame Material- und Kategorie-Einstellungen':selected.isPart?'Bauteil / Komponente':'Baugruppe';
@@ -1878,7 +1886,9 @@ $('touchSection').addEventListener('click',()=>{$('sectionButton').click();});
 $('touchPng').addEventListener('click',screenshot);
 $('touchTheme').addEventListener('click',()=>$('themeButton').click());
 $('touchHelp').addEventListener('click',()=>$('helpButton').click());
-$('selectedPartChip').addEventListener('click',()=>{$('rightSidebar').classList.remove('open');$('leftSidebar').classList.add('open');});
+$('languageSelect').addEventListener('change',updatePartCaption);
+$('quickIsolate').addEventListener('click',isolateSelection);
+$('quickShowAll').addEventListener('click',showAll);
 
 $('openButton').addEventListener('click',openFileDialog);
 $('emptyOpen').addEventListener('click',openFileDialog);
@@ -1956,11 +1966,40 @@ document.addEventListener('pointerdown',e=>{
 window.addEventListener('resize',placeExportMenu);
 window.addEventListener('scroll',placeExportMenu,true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeExportMenu()});
-function closeMobilePanels(){$('leftSidebar').classList.remove('open');$('rightSidebar').classList.remove('open')}
-$('mobileTree').addEventListener('click',()=>{$('leftSidebar').classList.toggle('open');$('rightSidebar').classList.remove('open')});
-$('mobileProperties').addEventListener('click',()=>{$('rightSidebar').classList.toggle('open');$('leftSidebar').classList.remove('open')});
+function closeMobilePanels(){
+  $('leftSidebar').classList.remove('open');
+  $('rightSidebar').classList.remove('open');
+  $('partActions').hidden=true;
+  $('selectedPartChip').setAttribute('aria-expanded','false');
+  $('partTools').setAttribute('aria-expanded','false');
+  inspectionGyro?.recenter();
+}
+$('selectedPartChip').addEventListener('click',()=>{
+  const open=!$('leftSidebar').classList.contains('open');
+  closeMobilePanels();
+  $('leftSidebar').classList.toggle('open',open);
+  $('selectedPartChip').setAttribute('aria-expanded',String(open));
+  if(open) $('assemblyTree').querySelector('.selected')?.scrollIntoView({block:'nearest'});
+});
+$('partTools').addEventListener('click',()=>{
+  const open=$('partActions').hidden;
+  closeMobilePanels();
+  $('partActions').hidden=!open;
+  $('partTools').setAttribute('aria-expanded',String(open));
+});
+$('mobileProperties').addEventListener('click',()=>{
+  const open=!$('rightSidebar').classList.contains('open');
+  closeMobilePanels();
+  $('rightSidebar').classList.toggle('open',open);
+});
 $('drawerTools').addEventListener('click',()=>$('mobileProperties').click());
 $('closeLeft').addEventListener('click',closeMobilePanels);$('closeRight').addEventListener('click',closeMobilePanels);
+interactionSurface.addEventListener('pointerdown',event=>{
+  if (!document.body.classList.contains('inspection')) return;
+  if ($('partActions').hidden && !document.querySelector('.sidebar.open')) return;
+  closeMobilePanels();
+  event.stopImmediatePropagation();
+},true);
 $('viewportShell').addEventListener('click',e=>{if(document.body.classList.contains('inspection')&&e.target===interactionSurface)closeMobilePanels()});
 for(const eventType of ['dragenter','dragover'])window.addEventListener(eventType,e=>{if(e.dataTransfer?.types?.includes('Files')){e.preventDefault();$('dropOverlay').classList.remove('hidden')}});
 window.addEventListener('dragleave',e=>{if(e.relatedTarget===null||!document.elementFromPoint(e.clientX,e.clientY))$('dropOverlay').classList.add('hidden')});
