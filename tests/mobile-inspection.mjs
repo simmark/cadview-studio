@@ -19,7 +19,26 @@ try {
       return window.denyGyro ? 'denied' : 'granted';
     }});
   });
+  // Recreate the old shell's warmed engine cache on the same origin before the new worker installs.
+  await page.goto(new URL('README.md',origin).href);
+  await page.evaluate(async()=>{
+    const old = await caches.open('cadview-studio-1.5.0');
+    await old.addAll(['./vendor/occt-import-js/occt-import-js.js','./vendor/occt-import-js/occt-import-js.wasm']);
+    const sibling = await caches.open('s-parameter-test');
+    await sibling.put('sentinel',new Response('preserve'));
+  });
   await page.goto(origin);
+  await page.evaluate(()=>navigator.serviceWorker.ready);
+  await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
+  await page.waitForFunction(()=>navigator.serviceWorker.controller?.state === 'activated');
+  assert.deepEqual(await page.evaluate(async()=>{
+    const cache = await caches.open('cadview-deps-1.5.0');
+    return [await caches.has('cadview-studio-1.5.0'),
+      Boolean(await cache.match('./vendor/occt-import-js/occt-import-js.js')),
+      Boolean(await cache.match('./vendor/occt-import-js/occt-import-js.wasm')),
+      Boolean(await (await caches.open('s-parameter-test')).match('sentinel'))];
+  }),[false,true,true,true]);
+  console.log('PASS warm 1.5.0 engine-cache migration and sibling cache retention');
   await page.waitForFunction(()=>document.querySelector('#fileName').textContent.includes('Demo'));
   const el = id=>page.locator('#'+id);
   const click = id=>el(id).click();
