@@ -7,6 +7,9 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
+import {installTouch} from './mobile/touch.js?v=m1';
+import {installInspection} from './mobile/inspection.js?v=m1';
+
 const $ = (id) => document.getElementById(id);
 const canvas = $('cadCanvas');
 // Separate interactive pointer layer above the WebGL canvas.
@@ -60,6 +63,9 @@ const MEASURE_DRAG_THRESHOLD = 6;
 const cadence = {frame:0,hovering:false};
 const geometryEdgeCache = new WeakMap();
 let selected = null;
+let inspectionGyro;
+let visibilityHistory = [];
+const touchMultiActive = () => document.body.classList.contains('inspection') && $('touchMulti').getAttribute('aria-pressed') === 'true';
 const selectedNodes = new Set();
 let lastTreeSelection = null;
 let sourceStepText = null;
@@ -145,6 +151,8 @@ function setLoading(show,text='',detail=''){
 function updateStatus(s){$('statusText').textContent=s}
 function getMeshes(node){const arr=[];if(node)node.traverse(o=>{if(o.isMesh)arr.push(o)});return arr;}
 function resetModel(){
+  visibilityHistory = [];
+  $('touchUndo').disabled = true;
   clearMeasure(); clearSavedMeasurements(); clearAutoDimensions(); selectNode(null);
   sourceStepText=null;stepGlobalTransform.identity();stepExportCompatible=true;fileIdentity='demo';
   if(selectionBox){scene.remove(selectionBox);selectionBox.geometry.dispose();selectionBox.material.dispose();selectionBox=null;}
@@ -352,6 +360,7 @@ function contentBounds(root){
 function isActuallyVisible(o){let v=o;while(v){if(!v.visible)return false;v=v.parent}return true}
 function baseBounds(){const b=new THREE.Box3();if(!modelRoot)return b;modelRoot.updateWorldMatrix(true,true);modelRoot.traverse(o=>{if(o.isMesh)b.expandByObject(o,true)});return b;}
 function fitToObject(o){
+  inspectionGyro?.recenter();
   const b=contentBounds(o); if(b.isEmpty()) {toast('Keine sichtbare Geometrie zum Einpassen.');return;}
   const size=b.getSize(new THREE.Vector3()); const center=b.getCenter(new THREE.Vector3());
   const radius=Math.max(size.length()*.63,1);
@@ -368,6 +377,7 @@ function fitToObject(o){
   renderNow('fit to model');
 }
 function setView(type){
+  inspectionGyro?.recenter();
   if(!modelRoot)return;
   const b=contentBounds(modelRoot);if(b.isEmpty())return;
   const center=b.getCenter(new THREE.Vector3());
@@ -430,6 +440,10 @@ function selectNode(node, multi=false){
   document.querySelectorAll('.tree-node').forEach(el=>el.classList.toggle('selected',selectedNodes.has(allNodes.find(n=>String(n.id)===el.dataset.id))));
   const count=selectedNodes.size;
   $('selectedName').textContent=count===0?'Gesamtes Modell':count===1?selected.obj.name:`${count} Elemente ausgewählt`;
+  $('selectedPartChip').hidden = !count;
+  $('selectedPartChip').textContent = count === 1 ? selected.obj.name : String(count);
+  $('touchHide').disabled = !count;
+  $('touchFocus').disabled = !count;
   $('selectedInfo').textContent=count===0?'Kein einzelnes Bauteil ausgewählt':count>1?'Gemeinsame Material- und Kategorie-Einstellungen':selected.isPart?'Bauteil / Komponente':'Baugruppe';
   $('partCategory').value=count===1?(selected.category||'Sonstige'):'';
   updateMaterialControls();updateDimensions();
@@ -498,13 +512,13 @@ function updateTree(){
     if(!nodeVisible(node))row.classList.add('dimmed');
     const indent=document.createElement('span');indent.className='tree-indent';indent.style.setProperty('--indent',Math.min(depth,15)*13+'px');row.append(indent);
     const arrow=document.createElement('button');arrow.className='tree-arrow'+(node.children.length?'':' empty');arrow.textContent=node.collapsed&&!term?'▸':'▾';arrow.title='Bauteile ein-/ausklappen';arrow.addEventListener('click',e=>{e.stopPropagation();node.collapsed=!node.collapsed;updateTree()});row.append(arrow);
-    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.innerHTML=nodeVisible(node)?'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>':'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6"/></svg>';eye.setAttribute('aria-label',nodeVisible(node)?'Ausblenden':'Einblenden');eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();node.obj.visible=!node.obj.visible;updateTree();updateDimensions();refreshSelectionBox();renderNow('single part visibility changed')});row.append(eye);
+    const eye=document.createElement('button');eye.className='tree-eye'+(nodeVisible(node)?'':' off');eye.innerHTML=nodeVisible(node)?'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>':'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6"/></svg>';eye.setAttribute('aria-label',nodeVisible(node)?'Ausblenden':'Einblenden');eye.title=nodeVisible(node)?'Ausblenden':'Einblenden';eye.addEventListener('click',e=>{e.stopPropagation();rememberVisibility();node.obj.visible=!node.obj.visible;updateTree();updateDimensions();refreshSelectionBox();renderNow('single part visibility changed')});row.append(eye);
     const icon=document.createElement('span');icon.className='tree-symbol'+(node.isPart?' mesh':'');icon.textContent=node.isPart?'⬡':'▤';row.append(icon);
     const name=document.createElement('span');name.className='tree-name';name.textContent=node.obj.name||'Unbenannt';name.title=node.obj.name;row.append(name);
     row.addEventListener('click',e=>{
       if(e.shiftKey&&lastTreeSelection){const a=allNodes.indexOf(lastTreeSelection),b=allNodes.indexOf(node);for(const n of allNodes.slice(Math.min(a,b),Math.max(a,b)+1))selectedNodes.add(n);selectedNodes.delete(node);selectNode(node,true);}
-      else selectNode(node,e.ctrlKey||e.metaKey);
-      lastTreeSelection=node;updateTree();if(!(e.ctrlKey||e.metaKey||e.shiftKey))closeMobilePanels();
+      else selectNode(node,e.ctrlKey||e.metaKey||touchMultiActive());
+      lastTreeSelection=node;updateTree();if(!(e.ctrlKey||e.metaKey||e.shiftKey||touchMultiActive()))closeMobilePanels();
     });
     row.addEventListener('dblclick',()=>fitToObject(node.obj));
     row.addEventListener('contextmenu',e=>{e.preventDefault();selectNode(node);isolateSelection()});
@@ -515,9 +529,17 @@ function updateTree(){
   root.append(frag);
   if(!root.children.length){const el=document.createElement('div');el.className='tree-no-results';el.textContent='Keine passenden Bauteile';root.append(el)}
 }
-function showAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=true);updateTree();updateDimensions();refreshSelectionBox();renderNow('all visible')}
-function hideAll(){if(!modelRoot)return;allNodes.forEach(n=>n.obj.visible=false);updateTree();updateDimensions();refreshSelectionBox();renderNow('all hidden')}
+function rememberVisibility(){
+  if (!modelRoot) return;
+  const previous = Uint8Array.from(allNodes, node => node.obj.visible);
+  visibilityHistory.push(previous);
+  if (visibilityHistory.length > 12) visibilityHistory.shift();
+  $('touchUndo').disabled = false;
+}
+function showAll(){if(!modelRoot)return;rememberVisibility();allNodes.forEach(n=>n.obj.visible=true);updateTree();updateDimensions();refreshSelectionBox();renderNow('all visible')}
+function hideAll(){if(!modelRoot)return;rememberVisibility();allNodes.forEach(n=>n.obj.visible=false);updateTree();updateDimensions();refreshSelectionBox();renderNow('all hidden')}
 function isolateSelection(){if(!selectedNodes.size){toast('Bitte zuerst mindestens ein Bauteil auswählen.');return}
+  rememberVisibility();
   allNodes.forEach(n=>n.obj.visible=false);
   for(const node of selectedNodes){
     node.obj.visible=true;node.obj.traverse(o=>o.visible=true);
@@ -643,6 +665,7 @@ function screenIntersections(evt){
 }
 let pointerDown = null;
 interactionSurface.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch')return;
   if(e.button===0)pointerDown={id:e.pointerId,x:e.clientX,y:e.clientY,maxMotion:0};
   if($('inputFeedback'))$('inputFeedback').textContent=language()==='en'?'Pointer received · click or drag':'Eingabe erkannt · klicken oder ziehen';
 });
@@ -655,15 +678,19 @@ interactionSurface.addEventListener('pointerup',e=>{
   // even if the cursor returned to its initial location before mouseup.
   const traveled=Math.max(displacement,down.maxMotion,activeDrag?.moved||0);
   if(traveled>(measuring?MEASURE_DRAG_THRESHOLD:5)||!modelRoot)return;
+  pickAt(e);
+});
+function pickAt(e){
+  if(!modelRoot)return;
   const hits=screenIntersections(e);
   if(measuring){
     if(hits.length)addMeasurePoint(snapMeasurePoint(hits[0],e));
     else toast('Bitte direkt auf eine Modellfläche klicken.');
     return;
   }
-  selectNode(hits.length?closestNodeFromObject(hits[0].object):null,e.ctrlKey||e.metaKey);
+  selectNode(hits.length?closestNodeFromObject(hits[0].object):null,e.ctrlKey||e.metaKey||(e.pointerType==='touch'&&touchMultiActive()));
   updateTree();
-});
+}
 window.addEventListener('pointercancel',()=>{pointerDown=null});
 window.addEventListener('blur',()=>{pointerDown=null});
 
@@ -1607,7 +1634,7 @@ function translateVisibleUI(){
     let de=n._cadOriginal,trimmed=de.trim();
     const changedTo=n.textContent.trim();
     if(TRANSLATIONS[trimmed] && changedTo!==trimmed && changedTo!==TRANSLATIONS[trimmed]){n._cadOriginal=n.textContent;de=n._cadOriginal;trimmed=de.trim()}
-    if(!trimmed)continue;
+    if(!trimmed || n.parentElement.closest('[data-inspect-en]'))continue;
     const english=TRANSLATIONS[trimmed];
     if(english){const target=lang==='en'?english:trimmed;
       const desired=de.replace(trimmed,target);
@@ -1666,6 +1693,7 @@ function setupHelpAndLocalization(){
     if(action==='show')showAll();
     else if(action==='hide'){
       if(!selectedNodes.size)return toast(language()==='en'?'Select a part first':'Bitte zuerst ein Bauteil auswählen.');
+      rememberVisibility();
       for(const node of selectedNodes)node.obj.visible=false;
       updateTree();updateDimensions();refreshSelectionBox();
       renderNow('keyboard hide');
@@ -1732,6 +1760,11 @@ function cameraZoomDelta(dy){
   controls.update();pointerDiagnostics.zooms++;
   renderNow('wheel zoom');
 }
+const touch = installTouch(interactionSurface, {
+  orbit:cameraOrbitPixels, pan:cameraPanPixels,
+  zoom:ratio=>cameraZoomDelta(Math.log(ratio)/0.0014),
+  tap:pickAt, rebase:()=>inspectionGyro?.recenter()
+});
 function syncInteractionMode(){
   const button=$('interactionModeToggle');if(!button)return;
   const isModel=manipulationMode==='model';
@@ -1750,7 +1783,7 @@ $('interactionModeToggle')?.addEventListener('click',()=>{
 });
 interactionSurface.addEventListener('contextmenu',e=>e.preventDefault());
 interactionSurface.addEventListener('pointerdown',e=>{
-  if(e.button!==0&&e.button!==1&&e.button!==2)return;
+  if(e.pointerType==='touch'||(e.button!==0&&e.button!==1&&e.button!==2))return;
   activeDrag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,button:e.button,
     pan:e.button!==0||e.shiftKey,mode:manipulationMode,moved:0};
   pointerDiagnostics.down++;
@@ -1819,6 +1852,31 @@ $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   catch{window.prompt('CADVIEW Diagnose – kopieren',textReport)}
 });
 syncInteractionMode();
+inspectionGyro = installInspection({camera,target:controls.target,touch,closePanels:closeMobilePanels,
+  update:()=>{controls.update();renderNow('gyro orbit');}
+});
+$('touchMulti').addEventListener('click',()=> $('touchMulti').setAttribute('aria-pressed',String(!touchMultiActive())));
+$('touchUndo').disabled = true;
+$('touchUndo').addEventListener('click',()=>{
+  const previous=visibilityHistory.pop();
+  if (!previous) return;
+  allNodes.forEach((node,index)=>{node.obj.visible=Boolean(previous[index]);});
+  $('touchUndo').disabled=!visibilityHistory.length;
+  updateTree();updateDimensions();refreshSelectionBox();renderNow('undo visibility');
+});
+$('touchHide').addEventListener('click',()=>{
+  if(!selectedNodes.size)return;
+  rememberVisibility();
+  for(const node of selectedNodes)node.obj.visible=false;
+  updateTree();updateDimensions();refreshSelectionBox();renderNow('hide selection');
+});
+$('touchFocus').addEventListener('click',()=>{if(selected)fitToObject(selected.obj);closeMobilePanels();});
+$('touchFit').addEventListener('click',()=>{fitToObject(modelRoot);closeMobilePanels();});
+$('touchMeasure').addEventListener('click',()=>{$('measureButton').click();closeMobilePanels();});
+$('touchSection').addEventListener('click',()=>{$('sectionButton').click();});
+$('touchTheme').addEventListener('click',()=>$('themeButton').click());
+$('touchHelp').addEventListener('click',()=>$('helpButton').click());
+$('selectedPartChip').addEventListener('click',()=>{$('rightSidebar').classList.remove('open');$('leftSidebar').classList.add('open');});
 
 $('openButton').addEventListener('click',openFileDialog);
 $('emptyOpen').addEventListener('click',openFileDialog);
@@ -1837,8 +1895,8 @@ document.querySelectorAll('[data-orbit]').forEach(el=>el.addEventListener('click
 $('quickRotateModel')?.addEventListener('click',()=>{rotateActive('z',90);document.querySelector('[data-panel=transform]')?.click()});
 $('gridButton').addEventListener('click',()=>{const next=!grid.visible;grid.visible=next;axes.visible=next;$('gridButton').classList.toggle('active',next);$('gridButton').setAttribute('aria-pressed',String(next));renderNow('grid visibility changed')});
 $('wireframeButton').addEventListener('click',()=>{edgesEnabled=!edgesEnabled;showEdges(edgesEnabled);$('wireframeButton').classList.toggle('active',edgesEnabled);$('wireframeButton').setAttribute('aria-pressed',String(edgesEnabled))});
-$('measureButton').addEventListener('click',()=>{measuring=!measuring;clearMeasure();interactionSurface.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast(language()==='en'?'Measure: click two points. Magnetic snapping is enabled.':'Messen: Zwei Punkte anklicken. Magnetischer Fang ist aktiviert.')});
-$('sectionButton').addEventListener('click',()=>{clipEnabled=!clipEnabled;$('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection();$('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled))});
+$('measureButton').addEventListener('click',()=>{measuring=!measuring;$('touchMeasure').setAttribute('aria-pressed',String(measuring));clearMeasure();interactionSurface.style.cursor=measuring?'crosshair':'grab';$('measureButton').classList.toggle('active',measuring);$('measureButton').setAttribute('aria-pressed',String(measuring));if(measuring)toast(language()==='en'?'Measure: click two points. Magnetic snapping is enabled.':'Messen: Zwei Punkte anklicken. Magnetischer Fang ist aktiviert.')});
+$('sectionButton').addEventListener('click',()=>{clipEnabled=!clipEnabled;$('touchSection').setAttribute('aria-pressed',String(clipEnabled));$('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection();$('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled))});
 $('sectionRange').addEventListener('input',updateSection);
 for(const id of ['sectionAxis','sectionInvert','sectionNx','sectionNy','sectionNz','section2Axis','section2Range','section2Invert']) $(id).addEventListener('input',updateSection);
 $('section2Toggle').addEventListener('change',()=>{ $('section2Range').disabled=!clipEnabled||!$('section2Toggle').checked;modelRoot?.traverse(applyFlagsToMesh);updateSection() });
@@ -1900,13 +1958,13 @@ function closeMobilePanels(){$('leftSidebar').classList.remove('open');$('rightS
 $('mobileTree').addEventListener('click',()=>{$('leftSidebar').classList.toggle('open');$('rightSidebar').classList.remove('open')});
 $('mobileProperties').addEventListener('click',()=>{$('rightSidebar').classList.toggle('open');$('leftSidebar').classList.remove('open')});
 $('closeLeft').addEventListener('click',closeMobilePanels);$('closeRight').addEventListener('click',closeMobilePanels);
-$('viewportShell').addEventListener('click',e=>{if(window.innerWidth<671&&e.target.closest('.canvas-area'))closeMobilePanels()});
+$('viewportShell').addEventListener('click',e=>{if(document.body.classList.contains('inspection')&&e.target===interactionSurface)closeMobilePanels()});
 for(const eventType of ['dragenter','dragover'])window.addEventListener(eventType,e=>{if(e.dataTransfer?.types?.includes('Files')){e.preventDefault();$('dropOverlay').classList.remove('hidden')}});
 window.addEventListener('dragleave',e=>{if(e.relatedTarget===null||!document.elementFromPoint(e.clientX,e.clientY))$('dropOverlay').classList.add('hidden')});
 window.addEventListener('drop',e=>{e.preventDefault();$('dropOverlay').classList.add('hidden');const f=e.dataTransfer?.files?.[0];if(f)loadFile(f)});
 window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='o'){e.preventDefault();openFileDialog()}
-  if(e.key==='Escape' && !$('helpDialog').open){if(measuring){measuring=false;$('measureButton').classList.remove('active');clearMeasure();interactionSurface.style.cursor='grab'}else{selectNode(null);updateTree()}closeMobilePanels()}
+  if(e.key==='Escape' && !$('helpDialog').open){if(measuring){measuring=false;$('touchMeasure').setAttribute('aria-pressed','false');$('measureButton').setAttribute('aria-pressed','false');$('measureButton').classList.remove('active');clearMeasure();interactionSurface.style.cursor='grab'}else{selectNode(null);updateTree()}closeMobilePanels()}
   if(e.key.toLowerCase()==='f')fitToObject(selected?.obj||modelRoot);
 });
 
@@ -1933,7 +1991,7 @@ $('measureBoundsButton').addEventListener('click',addAutoDimensions);
 $('clearAllMeasurements').addEventListener('click',()=>{clearSavedMeasurements();clearAutoDimensions();toast('Alle Bemaßungen entfernt.')});
 $('measureUnits').addEventListener('change',refreshMeasurementDisplays);
 interactionSurface.addEventListener('pointermove',e=>{
-  if(!measuring)return;
+  if(!measuring||e.pointerType==='touch')return;
   if(pointerDown&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>MEASURE_DRAG_THRESHOLD){
     $('snapMarker')?.classList.add('hidden');snapPreview=null;return;
   }
