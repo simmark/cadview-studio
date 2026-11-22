@@ -17,7 +17,7 @@
 <script type="importmap">
   {"imports":{"three":"./vendor/three/build/three.module.min.js","three/addons/":"./vendor/three/examples/jsm/"}}
   </script>
-<link href="./rework.css?v=1.5.0" rel="stylesheet"/></head>
+<link href="./rework.css?v=1.5.0" rel="stylesheet"/><link rel="stylesheet" href="./mobile/inspection.css?v=m2"/></head>
 <body>
 <div class="app">
 <header class="topbar">
@@ -35,15 +35,23 @@
 <button data-export="obj"><strong>OBJ</strong><span>Geometrie ohne MTL-Datei</span></button><button data-export="step"><strong>STEP (Original)</strong><span>Unveränderte CAD-Datei; Dreh-Export noch nicht verfügbar</span></button><button data-export="project"><strong>Projekt JSON</strong><span>Rotationen, Kategorien, Materialien, Maße</span></button>
 </div>
 </div>
-<button class="top-btn help-link" id="helpButton" title="Hilfe und Tastenkürzel / Help and shortcuts" aria-label="Hilfe und Tastenkürzel / Help and shortcuts" type="button">?</button>
+<button type="button" class="top-btn" id="drawerTools" aria-controls="rightSidebar" data-inspect-de="Werkzeuge" data-inspect-en="Tools">Werkzeuge</button><button type="button" id="desktopFullscreen" data-inspect-de="Vollbild" data-inspect-en="Fullscreen" class="top-btn">Vollbild</button><button class="top-btn help-link" id="helpButton" title="Hilfe und Tastenkürzel / Help and shortcuts" aria-label="Hilfe und Tastenkürzel / Help and shortcuts" type="button">?</button>
 </div>
 </header>
-<div class="workspace">
+<div class="inspection-head">
+<button type="button" id="exitInspection" data-inspect-de="‹ Zurück" data-inspect-en="‹ Back" >‹ Zurück</button><span id="gyroStatus" role="status"></span><button type="button" id="gyroToggle" data-inspect-de="Gyro · Test" data-inspect-en="Gyro · Beta" aria-pressed="false">Gyro · Test</button><button type="button" id="gyroCenter" data-inspect-de="Zentrieren" data-inspect-en="Recenter" >Zentrieren</button></div>
+<div class="workspace"><div class="part-hud">
+<button id="selectedPartChip" type="button" aria-controls="leftSidebar" aria-expanded="false"><span id="partCaption">Modellbaum</span> ▾</button>
+<button id="partTools" type="button" aria-controls="partActions" aria-expanded="false"><span data-inspect-de="Werkzeuge" data-inspect-en="Tools">Werkzeuge</span> ▾</button>
+</div>
+<div id="partActions" class="inspection-actions" hidden>
+<button type="button" id="touchHide" data-inspect-de="Ausblenden" data-inspect-en="Hide" >Ausblenden</button><button type="button" id="touchFocus" data-inspect-de="Fokus" data-inspect-en="Focus" >Fokus</button><button type="button" id="touchUndo" data-inspect-de="Rückgängig" data-inspect-en="Undo visibility" >Rückgängig</button><button type="button" id="quickIsolate" data-inspect-de="Alleine anzeigen" data-inspect-en="Isolate">Alleine anzeigen</button><button type="button" id="quickShowAll" data-inspect-de="Alle anzeigen" data-inspect-en="Show all">Alle anzeigen</button><label id="gyroModeLabel"><span data-inspect-de="Gyro-Modus" data-inspect-en="Gyro mode">Gyro-Modus</span><select id="gyroMode"><option value="orbit" data-inspect-de="Umkreisen" data-inspect-en="Orbit">Umkreisen</option><option value="look" data-inspect-de="Am Standort umsehen" data-inspect-en="Look around">Am Standort umsehen</option></select></label>
+</div>
 <aside class="sidebar sidebar-left" id="leftSidebar">
 <div class="sidebar-title"><div><span class="eyebrow">PROJEKT</span><h2>Modellstruktur</h2></div><button class="icon-button mobile-close" id="closeLeft" title="Schließen" type="button">×</button></div>
 <div class="file-card" id="fileCard"><span class="file-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg></span><div class="file-text"><strong id="fileName">Demo · Präzisionsbaugruppe</strong><span id="fileMeta">6 Komponenten · Demo</span></div><span class="online-indicator"></span></div>
 <div class="section-top"><span>BAUTEILE</span><span class="count-pill" id="partCount">6</span></div>
-<div class="tree-tools"><input aria-label="Bauteile suchen" autocomplete="off" id="treeSearch" placeholder="Bauteile suchen …" type="search"/><button id="showAllButton" title="Alle Teile sichtbar machen" aria-label="Alle Teile sichtbar machen" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button id="hideAllButton" title="Alle Teile ausblenden" aria-label="Alle Teile ausblenden" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></div>
+<div class="inspection-actions"><button type="button" id="touchMulti" data-inspect-de="Mehrfachwahl" data-inspect-en="Multi-select" aria-pressed="false">Mehrfachwahl</button></div><div class="tree-tools"><input aria-label="Bauteile suchen" autocomplete="off" id="treeSearch" placeholder="Bauteile suchen …" type="search"/><button id="showAllButton" title="Alle Teile sichtbar machen" aria-label="Alle Teile sichtbar machen" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button id="hideAllButton" title="Alle Teile ausblenden" aria-label="Alle Teile ausblenden" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></div>
 <p class="tree-help">Mehrfachauswahl: Strg-Klick, Umschalt-Klick oder Strg im 3D-Modell.</p><div class="tree-scroll" id="treeScroll"><div aria-label="Baugruppenstruktur" class="assembly-tree" id="assemblyTree"></div></div>
 <div class="left-bottom">
 <div class="section-top"><span>SCHNELLZUGRIFF</span></div>
@@ -62,6 +70,7 @@
 <div class="empty-overlay hidden" id="emptyOverlay"><span class="empty-glyph">◇</span><h2>Dein Modell beginnt hier.</h2><p>Ziehe eine STEP-, IGES-, STL-, OBJ- oder GLB-Datei in dieses Fenster.</p><button class="top-btn primary" id="emptyOpen" type="button">Datei auswählen</button></div>
 <div class="drop-overlay hidden" id="dropOverlay"><div class="drop-inner"><span>↥</span><h2>3D-Modell ablegen</h2><p>STEP · IGES · STL · OBJ · GLB · GLTF · BREP</p></div></div>
 <div class="loading-overlay hidden" id="loadingOverlay"><div class="loader"></div><strong id="loadingText">CAD-Datei wird eingelesen …</strong><p id="loadingDetail">Bei komplexen STEP-Baugruppen kann das einen Moment dauern.</p></div>
+
 <div class="measure-label hidden" id="measureLabel"></div>
 <div class="input-feedback" id="inputFeedback" aria-live="off">Linke Maustaste ziehen: Kamera drehen</div><div class="viewport-hint" id="viewportHint">Drehen: links · Zoomen: Rad · Verschieben: rechts · <kbd>?</kbd> Tastenkürzel</div>
 </div>
@@ -69,7 +78,7 @@
 </main>
 <aside class="sidebar sidebar-right" id="rightSidebar">
 <div class="sidebar-title right-title"><div><span class="eyebrow">EIGENSCHAFTEN</span><h2>Inspektor</h2></div><button class="icon-button mobile-close" id="closeRight" title="Schließen" type="button">×</button></div>
-<div class="right-scroll">
+<div class="right-scroll"><div class="inspection-actions"><button type="button" id="touchMeasure" data-inspect-de="Messen" data-inspect-en="Measure" aria-pressed="false">Messen</button><button type="button" id="touchSection" data-inspect-de="Schnitt" data-inspect-en="Section" aria-pressed="false">Schnitt</button><button type="button" id="touchFit" data-inspect-de="Einpassen" data-inspect-en="Fit view" >Einpassen</button><button type="button" id="touchTheme" data-inspect-de="Hell / Dunkel" data-inspect-en="Light / dark" >Hell / Dunkel</button><button type="button" id="touchPng" data-inspect-de="Bild speichern" data-inspect-en="Save image">Bild speichern</button><button type="button" id="touchHelp" data-inspect-de="Hilfe" data-inspect-en="Help" >Hilfe</button></div>
 
 
 
@@ -128,7 +137,7 @@
 <div class="panel-label-row" style="margin-top:10px"><span>MESSUNGEN</span><button class="text-button" id="clearAllMeasurements" type="button">Alle löschen</button></div><div class="measure-buttons"><button class="panel-action" id="undoLastMeasurement" type="button">↶ Rückgängig</button><button aria-pressed="true" class="panel-action" id="toggleMeasurementVisibility" type="button">◉ Maße ausblenden</button></div><p class="dimension-note snap-legend">□ Ecke · ◐ Kantenmitte · ◔ Viertelpunkt · ◉ Flächenmitte. <strong>Alt</strong> = Fang vorübergehend aus. Dreiecksnetze: angenäherte Punkte.</p><div class="measurement-list" id="measurementList"><p class="dimension-note">Zwei Punkte im 3D-Modell auswählen oder automatische Bemaßung hinzufügen.</p></div><p class="dimension-note">Ecken- und Kantenfang basieren auf Dreiecksnetzen. Das ist keine analytische CAD-Kantenmessung. Schnitte sind visuell und verändern die Datei nicht.</p></section></div></div>
 </aside>
 </div>
-<footer class="mobile-bottom-bar"><button id="mobileTree" type="button">☷ Bauteile</button><button id="mobileOpen" type="button">↥ Öffnen</button><button id="mobileProperties" type="button">⚙ Material</button></footer>
+<footer class="mobile-bottom-bar"><button type="button" id="mobileOpen" data-inspect-de="Öffnen" data-inspect-en="Open" >Öffnen</button><button type="button" id="mobileProperties" data-inspect-de="Inspektor" data-inspect-en="Inspector" aria-controls="rightSidebar">Inspektor</button><button type="button" id="mobileFullscreen" data-inspect-de="Vollbild" data-inspect-en="Fullscreen" >Vollbild</button></footer>
 </div>
 <input accept=".json,application/json" class="sr-only" id="projectInput" type="file"/>
 <input accept=".step,.stp,.iges,.igs,.brep,.stl,.obj,.glb,.gltf" class="sr-only" id="fileInput" type="file"/>
@@ -140,10 +149,10 @@
 <div class="help-tools"><button type="button" id="inputDiagnosticsButton" class="panel-action" title="Eingaben, Kamera und Darstellungsstatus überprüfen; Diagnose kopieren">Diagnose kopieren</button></div>
 <p class="help-foot" data-local-de="Messmodus: Klicken = Punkt setzen; Ziehen = Kamera drehen." data-local-en="Measure mode: click to set a point; drag to orbit the camera.">Messmodus: Klicken = Punkt setzen; Ziehen = Kamera drehen.</p>
 <p class="help-foot" data-local-de="Windows-Dateizuordnung: Installiere CADVIEW als PWA und wähle es unter Öffnen mit als Standard-App für .stp, .step, .igs, .iges, .stl, .obj oder .glb. Nach PWA-Updates kann erneutes Installieren nötig sein." data-local-en="Windows file associations: Install CADVIEW as a PWA, then choose it under Open with as the default for .stp, .step, .igs, .iges, .stl, .obj or .glb. Reinstalling may be required after PWA updates.">Windows-Dateizuordnung: Installiere CADVIEW als PWA und wähle es unter Öffnen mit als Standard-App für .stp, .step, .igs, .iges, .stl, .obj oder .glb. Nach PWA-Updates kann erneutes Installieren nötig sein.</p>
-<p class="help-foot" id="helpDisclaimer">Messfang arbeitet auf gerenderten Dreiecksnetzen. Mesh-Ecken sind nicht zwingend geometrische CAD-Ecken. Die X/Y/Z-Anzeige zeigt die festen Weltachsen relativ zur aktuellen Kamerarichtung.</p>
+<p class="help-foot" data-local-de="Touch: Antippen wählt ein Teil. Ziehen dreht die Kamera. Zwei Finger zoomen und verschieben. Unter Vollbild kannst du den experimentellen Gyro-Orbit starten und die aktuelle Haltung zentrieren." data-local-en="Touch: tap to select a part, drag to orbit, or use two fingers to zoom and pan. In fullscreen you can start experimental gyro orbit and recenter at the current pose."></p><p class="help-foot" id="helpDisclaimer">Messfang arbeitet auf gerenderten Dreiecksnetzen. Mesh-Ecken sind nicht zwingend geometrische CAD-Ecken. Die X/Y/Z-Anzeige zeigt die festen Weltachsen relativ zur aktuellen Kamerarichtung.</p>
 <label class="help-option"><input checked="" id="skipOnboarding" type="checkbox"/> Diese Hilfe beim Start nicht erneut anzeigen</label>
 <div class="help-actions"><button class="panel-action primary-action" id="helpConfirm" type="button">Verstanden</button></div>
 </dialog>
-<script src="./app.js?v=1.5.0" type="module"></script>
-<script defer src="./gui.js?v=1.5.0"></script></body>
+<script src="./app.js?v=m2" type="module"></script>
+<script defer src="./gui.js?v=m2"></script></body>
 </html>

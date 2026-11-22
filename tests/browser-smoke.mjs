@@ -21,8 +21,10 @@ try {
   await page.waitForFunction(() => document.querySelector('#fileName')?.textContent?.includes('Demo'),null,{timeout:60000});
   await page.waitForTimeout(1200);
   const getDiag = async () => {
+    await page.locator('#helpButton').click();
     await page.locator('#inputDiagnosticsButton').click();
     const report = await page.evaluate(() => navigator.clipboard.readText());
+    await page.locator('#helpClose').click();
     return JSON.parse(report);
   };
   const initial = await getDiag();

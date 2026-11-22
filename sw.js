@@ -1,5 +1,5 @@
 /* CADVIEW Studio PWA 1.5.0. Same-origin shell incl. bundled three.js; OCCT engine cached on first use; CDN only as fallback. */
-const VERSION = 'cadview-studio-1.5.0';
+const VERSION = 'cadview-studio-mobile-m2';
 const RUNTIME = 'cadview-deps-1.5.0';
 const APP_FILES = [
   './',
@@ -7,8 +7,12 @@ const APP_FILES = [
   './styles.css?v=1.2.0',
   './enhancements.css?v=1.3.0',
   './rework.css?v=1.5.0',
-  './app.js?v=1.5.0',
-  './gui.js?v=1.5.0',
+  './app.js?v=m2',
+  './gui.js?v=m2',
+  './mobile/inspection.js?v=m2',
+  './mobile/touch.js?v=m2',
+  './mobile/gyro.js?v=m2',
+  './mobile/inspection.css?v=m2',
   './occt-worker.js?v=1.5.0',
   './manifest.webmanifest?v=1.5.0',
   './icons/icon-192.png',
@@ -28,11 +32,22 @@ const APP_FILES = [
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(APP_FILES)).then(()=>self.skipWaiting()));
 });
+async function preserveEngine(){
+  const previous = 'cadview-studio-1.5.0';
+  if (!(await caches.has(previous))) return;
+  const source = await caches.open(previous);
+  const next = await caches.open(RUNTIME);
+  for (const name of ['occt-import-js.js','occt-import-js.wasm']){
+    const key = './vendor/occt-import-js/' + name;
+    const response = await source.match(key);
+    if (response) await next.put(key,response);
+  }
+}
 self.addEventListener('activate', event => {
-  event.waitUntil(Promise.all([
+  event.waitUntil(preserveEngine().then(()=>Promise.all([
     caches.keys().then(names=>Promise.all(names.filter(n=>n.startsWith('cadview-')&&!([VERSION,RUNTIME].includes(n))).map(n=>caches.delete(n)))),
     self.clients.claim()
-  ]));
+  ])));
 });
 self.addEventListener('fetch',event=>{
   const request=event.request;
@@ -42,7 +57,8 @@ self.addEventListener('fetch',event=>{
   const isDependency=['cdn.jsdelivr.net','unpkg.com'].includes(url.hostname);
   if(!isLocal&&!isDependency)return;
   event.respondWith((async()=>{
-    const cache=await caches.open(isLocal?VERSION:RUNTIME);
+    const engine=isLocal && url.pathname.startsWith(new URL('./vendor/occt-import-js/',self.registration.scope).pathname);
+    const cache=await caches.open(isLocal&&!engine?VERSION:RUNTIME);
     // Always revalidate main HTML when online; cached shell still works offline.
     const freshFirst=isLocal&&(request.mode==='navigate'||url.pathname.endsWith('/index.html'));
     if(!freshFirst){
@@ -51,7 +67,7 @@ self.addEventListener('fetch',event=>{
     }
     try{
       const response=await fetch(request);
-      if(response.ok||response.type==='opaque')cache.put(request,response.clone()).catch(()=>{});
+      if(response.ok||response.type==='opaque')event.waitUntil(cache.put(request,response.clone()).catch(()=>{}));
       return response;
     }catch(err){
       const fallback=await cache.match(request);

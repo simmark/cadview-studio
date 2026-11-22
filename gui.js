@@ -45,7 +45,7 @@
     }
     if(remember)safeStore.set('cadview-active-panel',key);
     const right=$('rightSidebar');
-    if(right && getComputedStyle(right).position==='fixed')right.classList.add('open');
+    if(remember && right && getComputedStyle(right).position==='fixed')right.classList.add('open');
   }
   panelButtons.forEach((b,i)=>{
     b.addEventListener('click',()=>activatePanel(b.dataset.panel));

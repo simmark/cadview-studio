@@ -1,0 +1,107 @@
+/* CADVIEW inspection surfaces share the SIMONLATION hub palette. */
+:root {
+  --inspect-surface: #101e2a;
+  --inspect-chrome: #06121f;
+  --inspect-text: #eef6f3;
+  --inspect-accent: #b7f0d4;
+  --inspect-line: #41545c;
+}
+:root[data-theme="light"] {
+  --inspect-surface: #fbfcfb;
+  --inspect-chrome: #f0f3f0;
+  --inspect-text: #172a2b;
+  --inspect-accent: #17614c;
+  --inspect-line: #d4ded8;
+}
+.inspection-head, .inspection-actions, .part-chip { display:none }
+.inspection {
+  --rail-height: calc(52px + env(safe-area-inset-bottom,0px));
+  font-family:"Segoe UI",Inter,system-ui,sans-serif;
+}
+.inspection .app { min-width:0; height:100dvh }
+.inspection .workspace { display:flex; min-height:0 }
+.inspection #viewportShell { flex:1; width:100% }
+.inspection .viewport-toolbar, .inspection #welcomeTips, .inspection #inputFeedback,
+.inspection #viewportHint, .inspection #desktopFullscreen, .inspection .viewport-bottom .status-right { display:none }
+.inspection .topbar, .inspection .mobile-bottom-bar, .immersive .inspection-head {
+  background:var(--inspect-chrome); color:var(--inspect-text); border-color:var(--inspect-line);
+}
+.inspection .topbar {
+  height:auto; min-height:54px; padding:env(safe-area-inset-top,0px) max(8px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));
+}
+.inspection .topbar .brand { min-width:0 }
+.inspection .brand-badge, .inspection .top-actions > :is(button,.top-sep) { display:none }
+.inspection .brand-suffix { display:block }
+.inspection .top-actions .lang-control { display:flex; height:44px }
+.inspection #exportButton { min-height:44px }
+.inspection .viewport-bottom { min-height:26px; height:26px; padding-block:2px }
+.inspection .mobile-bottom-bar, .immersive .inspection-head {
+  display:flex; align-items:center; justify-content:space-evenly; gap:4px;
+  padding:4px max(6px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));
+}
+.inspection .mobile-bottom-bar { height:var(--rail-height); flex:none; z-index:95 }
+.inspection .mobile-bottom-bar button, .inspection-head button, .inspection-actions button, .inspection .part-chip {
+  border:1px solid var(--inspect-line); background:var(--inspect-surface); color:var(--inspect-text);
+  border-radius:6px; padding:6px 9px; min-height:44px; min-width:44px;
+  font:600 12px/1.2 "Segoe UI",system-ui,sans-serif;
+}
+.inspection .mobile-bottom-bar button { flex:1; max-width:180px }
+.inspection #mobileFullscreen, .immersive #exitInspection {
+  color:var(--inspect-accent); border-color:var(--inspect-accent)
+}
+.inspection button[aria-pressed="true"] { border-color:var(--inspect-accent); color:var(--inspect-accent) }
+.inspection .sidebar {
+  visibility:hidden; position:fixed; inset:auto max(0px,env(safe-area-inset-right)) var(--rail-height) max(0px,env(safe-area-inset-left));
+  width:min(100%,620px); margin-inline:auto; height:min(66dvh,590px); max-height:calc(100dvh - var(--rail-height) - 64px - env(safe-area-inset-top));
+  z-index:90; background:var(--inspect-surface); color:var(--inspect-text); border:1px solid var(--inspect-line);
+  border-radius:12px 12px 0 0; box-shadow:0 -8px 30px #0004; transform:none; transition:none; overflow:auto; overscroll-behavior:contain;
+}
+.inspection .sidebar.open { visibility:visible; transform:none }
+.inspection .sidebar-title { height:54px; min-height:54px; padding:6px 12px }
+.inspection .sidebar-title .mobile-close { display:block; min-width:44px; min-height:44px }
+.inspection .inspection-actions { display:flex; flex-wrap:wrap; gap:4px; padding:4px 10px 8px }
+.inspection .inspection-actions button:disabled, #gyroCenter:disabled { opacity:.55 }
+.inspection .sidebar-left .file-card { margin-block:0 5px; padding:5px 9px }
+.inspection .sidebar-left .tree-tools { margin-block:0 4px }
+.inspection .sidebar-left .tree-scroll { min-height:90px }
+.inspection .tree-node, .inspection .tree-arrow, .inspection .tree-eye { min-height:44px }
+.inspection .tree-arrow, .inspection .tree-eye { min-width:44px }
+.inspection .inspector-tabs { flex-wrap:wrap }
+.inspection .inspector-tab { min-height:44px }
+.inspection .part-chip:not([hidden]) {
+  display:block; position:absolute; z-index:6; top:8px; left:max(8px,env(safe-area-inset-left));
+  max-width:min(70%,380px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  border-inline-start:3px solid var(--inspect-accent);
+}
+.immersive .topbar, .immersive .viewport-bottom, .immersive #mobileOpen, .immersive #mobileFullscreen { display:none }
+.immersive .inspection-head {
+  min-height:52px; justify-content:flex-start; padding-block:max(4px,env(safe-area-inset-top)) 4px;
+}
+#gyroStatus { flex:1; font-size:11px; min-width:0; overflow-wrap:anywhere }
+@media (max-height:500px) {
+  .inspection .sidebar { height:calc(100dvh - var(--rail-height) - 60px) }
+  .inspection .sidebar-left .left-bottom, .inspection .sidebar-left .tree-scroll { flex-shrink:0 }
+  .inspection .sidebar-left .tree-scroll { max-height:50dvh; overflow:auto }
+}
+#drawerTools { display:none }
+@media (min-width:761px) and (max-width:1160px) {
+  body:not(.inspection) #drawerTools { display:inline-flex }
+}
+
+.part-hud, #partActions, #gyroModeLabel { display:none }
+.inspection .workspace { position:relative }
+.inspection .part-hud { position:absolute; inset:8px max(8px,env(safe-area-inset-right)) auto max(8px,env(safe-area-inset-left)); display:flex; justify-content:space-between; gap:12px; z-index:92; pointer-events:none }
+.part-hud button { pointer-events:auto; min-height:44px; min-width:0; max-width:68%; padding:0 12px; display:flex; align-items:center; gap:7px; color:var(--inspect-text); background:var(--inspect-surface); border:1px solid var(--inspect-line); border-radius:7px; font-weight:650 }
+#partCaption { overflow:hidden; white-space:nowrap; text-overflow:ellipsis }
+.part-hud [aria-expanded=true] { border-color:var(--inspect-accent) }
+.inspection #leftSidebar, .inspection #partActions:not([hidden]) { position:absolute; inset:58px auto auto max(8px,env(safe-area-inset-left)); width:min(340px,calc(100% - 16px)); height:auto; max-height:min(53dvh,calc(100% - 66px)); overflow:auto; margin:0; border-radius:9px; background:var(--inspect-surface); border:1px solid var(--inspect-line); z-index:91; box-shadow:0 6px 20px #0004 }
+.inspection #leftSidebar :is(.file-card,.left-bottom,.tree-help,.section-top,.sidebar-title,.tree-tools button) { display:none }
+.inspection #leftSidebar .tree-scroll { flex:1 1 auto; min-height:44px; overflow:auto }
+.inspection #leftSidebar .inspection-actions { padding-top:8px }
+.inspection #partActions:not([hidden]) { inset-inline:auto max(8px,env(safe-area-inset-right)); width:min(290px,calc(100% - 16px)); display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:6px; gap:4px; overscroll-behavior:contain; animation:tools-open 130ms ease-out }
+#quickIsolate { grid-row:1; grid-column:2 }
+#touchUndo { order:2 }
+.immersive #gyroModeLabel { display:grid; grid-column:1/-1; order:3; gap:3px; font-size:12px; padding:4px }
+#gyroMode { min-height:44px; font:inherit; color:var(--inspect-text); background:var(--inspect-chrome); border:1px solid var(--inspect-line); border-radius:5px }
+@keyframes tools-open { from { transform:translateX(10px);opacity:0 } }
+@media(prefers-reduced-motion:reduce){.inspection #partActions:not([hidden]){animation:none}}

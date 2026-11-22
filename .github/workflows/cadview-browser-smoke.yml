@@ -3,8 +3,10 @@ name: CADVIEW browser WebGL smoke test
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/mobile-immersive-cadview]
     paths:
+      - mobile/**
+      - tests/*.mjs
       - app.js
       - index.html
       - rework.css
@@ -16,7 +18,9 @@ on:
 
 jobs:
   browser-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      CADVIEW_URL: http://127.0.0.1:8765/cadview-studio/
     timeout-minutes: 20
     permissions:
       contents: read
@@ -31,9 +35,24 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Launch local GitHub Pages equivalent
         run: |
-          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/cadview-http.log 2>&1 &
+          mkdir -p "$RUNNER_TEMP/pages"
+          ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/pages/cadview-studio"
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory "$RUNNER_TEMP/pages" > /tmp/cadview-http.log 2>&1 &
           sleep 3
+      - name: Capture reference viewports
+        run: node tests/layout-screens.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cadview-layout
+          path: artifacts/layout/
       - name: Validate live 3D interactions
-        env:
-          CADVIEW_URL: http://127.0.0.1:8765/
         run: node tests/browser-smoke.mjs
+
+      - name: Validate touch, fullscreen, orientation and offline CAD import
+        env:
+          CADVIEW_STEP: /tmp/as1-oc-214.stp
+        run: |
+          curl --fail --location --retry 2 --output "$CADVIEW_STEP" https://raw.githubusercontent.com/kovacsv/occt-import-js/41e470890ae0f9dc69ac50ffd5fc73e03576f4eb/test/testfiles/cax-if/as1-oc-214.stp
+          node tests/check-release.mjs
+          node tests/gyro-controller.mjs
+          node tests/mobile-inspection.mjs

@@ -2,6 +2,42 @@
 
 Ziel: Kamera, STEP-Import, Live-Änderungen, Bemaßung und Export bei jedem Release nachvollziehbar prüfen. **Teststatus erst nach tatsächlichem Browser-Test auf PASS setzen.** Statische Codeprüfungen ersetzen keine WebGL-Tests.
 
+## Entwicklungsbranch · Mobile Inspektion · 22. November 2026
+
+Die historische Desktop-Checkliste ab „Umgebung“ bleibt als manueller Prüfkatalog erhalten. Der folgende Stand gilt für den Entwicklungsbranch auf Basis von 1.5.0. Die Browserprüfungen liefen auf Chromium mit Software-WebGL. Smartphone-Größen und Touch-Eingaben wurden emuliert.
+
+| Bereich | Beobachtetes Ergebnis | Verbleibende Prüfung |
+| --- | --- | --- |
+| M01–M02, M21, M24 | Geschlossene Start-Sheets, nutzbare Modellfläche und kein horizontales Überlaufen bei 360, 390 und 430 px, 844 × 390 und 820 × 1180. Sprachumschaltung, Themenaktion und Vollbild-Touchziel geprüft. | Safe Areas mit Displayausschnitt, Systemschriftvergrößerung, Screenreader und erreichbare Ziele im gesamten Inspektor. |
+| M03–M09 | Orbit mit einem Finger, kombinierter Pinch/Pan, direkter Pick im Modell, Mehrfachwahl im Baum, Isolieren, Ausblenden, Undo und Alle anzeigen. Zwei Touchpunkte schließen eine Messung ab. Ein Zug zurück zum Start setzt keinen Messpunkt. Schnitt und Explosion ändern in der Desktop-Suite das gerenderte Bild. | Fanggenauigkeit am Finger und Bedienkomfort bei dicht gepackten Baugruppen. |
+| M10–M17, M25 | Natives Vollbild und abgelehnter nativer Aufruf, Browser-Zurück, sichtbarer Exit, Kalibrierung ohne Sprung, konstanter Orbitabstand, Zentrieren, Pinch bei aktivem Gyro, Rückkehr mit Kamerazustand. Verweigerte Freigabe und ausbleibende Sensordaten erlauben weiter Touch. Der Controller-Test prüft ungültige Werte, verspätete Freigabe nach Exit, Displaydrehung und simulierten Hintergrundwechsel. | Echte Sensorrichtung, Drift, Dialoge, Unterbrechen durch Sperren der Geräte und Kombination aller Werkzeuge mit laufendem Sensor. |
+| M18–M20 | Öffentliche CAx-IF-Baugruppe as1-oc-214.stp über Dateieingabe und OCCT-Worker geladen. Vier Teile, gerenderte Dreiecke, offline erneut vier Teile nach Browser-Reload. Im Test nur GET an den eigenen Ursprung. GLB und PNG heruntergeladen und Dateisignaturen geprüft. | Große vertrauliche Modelle lokal auf Zielhardware, Downloadablage unter iOS und Android, externer GLB-Roundtrip. |
+| M22 | Desktop-Referenzsuite vor und nach der Umstellung bestanden. Mausorbit, Sofort-Highlight, H-Ausblenden, Schnitt, Explosion, Maßdarstellung, Einstellungen und Exportmenü. | Edge als installierte Windows-PWA, Dateizuordnung, manueller Vergleich mit der ursprünglichen 13-Teile-Baugruppe. |
+| M23 | Offline-Start nach dem Aufwärmen der CAD-Engine. Bei nachgebildetem 1.5.0-Cache wurden JS und WASM übernommen, der alte Shell-Cache entfernt und der Kontroll-Cache einer anderen App erhalten. | Update einer tatsächlich installierten PWA mit geöffnetem Projekt und Dateihandles. |
+
+[Bestandener Referenzlauf](https://github.com/simmark/cadview-studio/actions/runs/45020562571) · [Bestandener Branchlauf unter /cadview-studio/](https://github.com/simmark/cadview-studio/actions/runs/45021381893) · [Audit und Bildschirmvergleich](docs/MOBILE-AUDIT.md)
+
+### Reproduktion
+
+Node 22.15+ für den isolierten Controller-Test. Aus dem Repository-Stamm:
+
+```sh
+node tests/check-release.mjs
+node tests/gyro-controller.mjs
+```
+
+Für die Browserprüfungen führt der Workflow „CADVIEW browser WebGL smoke test“ die Installation, den lokalen Pages-Server, Desktop- und Mobile-Suites sowie die Screenshotaufnahme aus. Er nutzt die im Workflow auf einen Commit festgelegte öffentliche Beispieldatei. Lokal akzeptiert die Mobile-Suite CADVIEW_URL und CADVIEW_STEP als Umgebungsvariablen.
+
+### Kurzer Hardware-Durchlauf
+
+1. Branch auf einer eigenen vertrauenswürdigen HTTPS-Testadresse öffnen. Gerät, Browser, Betriebssystem und Startart (Tab oder PWA) festhalten. Eine bekannte STEP-Baugruppe über „Öffnen“ laden.
+2. Ein innenliegendes Teil im Baum wählen. Gehäuse ausblenden, „Fokus“ anwenden und das Detail per Pinch vergrößern. Zweimal antippen im Messmodus muss genau eine Messung liefern. Beim Zurückziehen des Fingers darf kein weiterer Punkt entstehen.
+3. „Vollbild“ und dann „Gyro · Test“ wählen, Freigabe erteilen. Das Gerät ruhig halten, nach links/rechts und oben/unten neigen. Ansicht bei Start und Zentrieren, Richtung, verzögerte Reaktion und Drift notieren. Mit aktiver Gyrosteuerung zoomen, drehen und ins Querformat wechseln.
+4. Display sperren und fortsetzen, Schnitt bedienen und über „Zurück“ verlassen. Dateiname, Auswahl, ausgeblendete Teile und Kamera vergleichen. In einem neuen Berechtigungskontext die Sensoranfrage ablehnen und per Touch weiterarbeiten.
+5. Dieselbe Datei nach Aufwärmen und im Flugmodus wieder laden, PNG/GLB öffnen. Auf Edge zusätzlich per „Öffnen mit“ starten.
+
+Gyro-Orbit ist experimentell. Die Sicht vom festen Kamerastandpunkt im Inneren (Look-Around), einstellbare Sensitivität, eine Messlupe, gestufte Sheet-Höhen und Rendering-/Akkuprofiling stehen im Backlog. Für einen Merge sind physische Android- und iOS-Ergebnisse sowie die Edge-PWA-Prüfung offen.
+
 ## Umgebung
 
 - [ ] Windows 11 / Microsoft Edge als normaler Browser-Tab
