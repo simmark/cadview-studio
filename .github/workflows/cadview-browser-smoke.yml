@@ -45,3 +45,11 @@ jobs:
         env:
           CADVIEW_URL: http://127.0.0.1:8765/
         run: node tests/browser-smoke.mjs
+
+      - name: Validate touch, fullscreen, orientation and offline CAD import
+        env:
+          CADVIEW_STEP: /tmp/as1-oc-214.stp
+        run: |
+          curl --fail --location --retry 2 --output "$CADVIEW_STEP" https://raw.githubusercontent.com/kovacsv/occt-import-js/41e470890ae0f9dc69ac50ffd5fc73e03576f4eb/test/testfiles/cax-if/as1-oc-214.stp
+          node tests/check-release.mjs
+          node tests/mobile-inspection.mjs

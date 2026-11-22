@@ -1463,7 +1463,7 @@ function initializePwaFileHandling(){
   });
 }
 function initializePWA(){
-  if('serviceWorker' in navigator&&location.protocol==='https:'){
+  if('serviceWorker' in navigator && window.isSecureContext){
     navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Offline-Service-Worker:',e));
   }
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('installButton').title='Als Desktop- oder Mobil-App installieren'});
@@ -1839,7 +1839,7 @@ $('inputDiagnosticsButton')?.addEventListener('click',async()=>{
   const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
   const report={version:'1.5.0',surface:interactionSurface.id,hitAtCenter:hit?.id||hit?.className||hit?.tagName,
     size:[Math.round(rect.width),Math.round(rect.height)],pointerEvents:getComputedStyle(interactionSurface).pointerEvents,
-    mode:manipulationMode,measuring,measurementAppearance:{...measurementAppearance},events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,animationTicks,
+    mode:manipulationMode,measuring,pendingMeasurePoints:measurePoints.length,measurementAppearance:{...measurementAppearance},events:pointerDiagnostics,renderFrames:framesRendered,loopStarted,animationTicks,
     lastRenderFailure:lastRenderFailure.slice(0,900),lastStartupFailure:lastStartupFailure.slice(0,900),
     lastRenderAgeMs:lastRenderAt?Math.round(performance.now()-lastRenderAt):null,
     webglContextLost:renderer.getContext().isContextLost(),
@@ -1874,6 +1874,7 @@ $('touchFocus').addEventListener('click',()=>{if(selected)fitToObject(selected.o
 $('touchFit').addEventListener('click',()=>{fitToObject(modelRoot);closeMobilePanels();});
 $('touchMeasure').addEventListener('click',()=>{$('measureButton').click();closeMobilePanels();});
 $('touchSection').addEventListener('click',()=>{$('sectionButton').click();});
+$('touchPng').addEventListener('click',screenshot);
 $('touchTheme').addEventListener('click',()=>$('themeButton').click());
 $('touchHelp').addEventListener('click',()=>$('helpButton').click());
 $('selectedPartChip').addEventListener('click',()=>{$('rightSidebar').classList.remove('open');$('leftSidebar').classList.add('open');});
