@@ -1750,11 +1750,12 @@ function cameraPanPixels(dx,dy){
   pointerDiagnostics.pans++;
   renderNow('pointer pan');
 }
-function cameraZoomDelta(dy){
+function cameraZoomDelta(dy){cameraZoomRatio(Math.exp(dy*.0014));}
+function cameraZoomRatio(ratio){
   if(!modelRoot)return;
   const offset=camera.position.clone().sub(controls.target);
   const distance=offset.length();
-  const zoomed=THREE.MathUtils.clamp(distance*Math.exp(dy*.0014),controls.minDistance,controls.maxDistance);
+  const zoomed=THREE.MathUtils.clamp(distance*ratio,controls.minDistance,controls.maxDistance);
   if(distance<1e-8)return;
   camera.position.copy(controls.target).addScaledVector(offset,zoomed/distance);
   controls.update();pointerDiagnostics.zooms++;
@@ -1762,7 +1763,7 @@ function cameraZoomDelta(dy){
 }
 const touch = installTouch(interactionSurface, {
   orbit:cameraOrbitPixels, pan:cameraPanPixels,
-  zoom:ratio=>cameraZoomDelta(Math.log(ratio)/0.0014),
+  zoom:cameraZoomRatio,
   tap:pickAt, rebase:()=>inspectionGyro?.recenter()
 });
 function syncInteractionMode(){
@@ -1958,6 +1959,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeExportMenu()});
 function closeMobilePanels(){$('leftSidebar').classList.remove('open');$('rightSidebar').classList.remove('open')}
 $('mobileTree').addEventListener('click',()=>{$('leftSidebar').classList.toggle('open');$('rightSidebar').classList.remove('open')});
 $('mobileProperties').addEventListener('click',()=>{$('rightSidebar').classList.toggle('open');$('leftSidebar').classList.remove('open')});
+$('drawerTools').addEventListener('click',()=>$('mobileProperties').click());
 $('closeLeft').addEventListener('click',closeMobilePanels);$('closeRight').addEventListener('click',closeMobilePanels);
 $('viewportShell').addEventListener('click',e=>{if(document.body.classList.contains('inspection')&&e.target===interactionSurface)closeMobilePanels()});
 for(const eventType of ['dragenter','dragover'])window.addEventListener(eventType,e=>{if(e.dataTransfer?.types?.includes('Files')){e.preventDefault();$('dropOverlay').classList.remove('hidden')}});

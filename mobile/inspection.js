@@ -30,7 +30,7 @@ export function installInspection({camera,target,update,touch,closePanels}) {
     body.classList.toggle('inspection',compact.matches || immersive);
     body.classList.toggle('immersive',immersive);
   }
-  function leave() {
+  function leave(restoreHistory=true) {
     if (!immersive) return;
     immersive = false;
     gyro.stop();
@@ -39,10 +39,12 @@ export function installInspection({camera,target,update,touch,closePanels}) {
     layout();
     if (document.fullscreenElement === document.documentElement) document.exitFullscreen().catch(()=>{});
     entryButton?.focus();
+    if (restoreHistory && history.state?.cadviewImmersive) history.back();
   }
   function enter(event) {
     entryButton = event.currentTarget;
     immersive = true;
+    if (!history.state?.cadviewImmersive) history.pushState({...history.state,cadviewImmersive:true},'');
     closePanels();
     touch.reset();
     layout();
@@ -50,6 +52,15 @@ export function installInspection({camera,target,update,touch,closePanels}) {
     if (document.fullscreenEnabled && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(()=>{}); // CSS view already occupies the window.
     }
+  }
+  window.addEventListener('popstate',()=>{
+    if (immersive && !history.state?.cadviewImmersive) leave(false);
+  });
+  // A reload/forward navigation may land on an old inspection entry.
+  if (history.state?.cadviewImmersive) {
+    const state = {...history.state};
+    delete state.cadviewImmersive;
+    history.replaceState(state,'');
   }
   document.addEventListener('fullscreenchange',()=>{
     if (hasNative && !document.fullscreenElement) leave();

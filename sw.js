@@ -67,7 +67,7 @@ self.addEventListener('fetch',event=>{
     }
     try{
       const response=await fetch(request);
-      if(response.ok||response.type==='opaque')cache.put(request,response.clone()).catch(()=>{});
+      if(response.ok||response.type==='opaque')event.waitUntil(cache.put(request,response.clone()).catch(()=>{}));
       return response;
     }catch(err){
       const fallback=await cache.match(request);

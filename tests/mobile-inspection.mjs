@@ -83,7 +83,18 @@ try {
   assert.ok(drag.events.orbits>before.events.orbits);
   assert.equal(drag.pendingMeasurePoints,0);
   assert.equal(await page.locator('.measurement-entry').count(),0);
+  // Find a visible face via actual taps; moving to a neighbouring point completes a measurement.
+  let picked;
+  for (const offset of [0,12,-12,24,-24]) {
+    await page.touchscreen.tap(x+offset,y);
+    if ((await diag()).pendingMeasurePoints === 1) { picked=x+offset; break; }
+  }
+  assert.ok(picked,'A touch tap should place a first point on the demo');
+  await page.touchscreen.tap(picked+3,y+3);
+  assert.ok(await page.locator('.measurement-entry').count() >= 1);
   await click('mobileProperties'); await click('touchMeasure');
+  await page.touchscreen.tap(picked,y);
+  assert.ok(await el('selectedPartChip').isVisible(),'Tap on the model shows its name');
   await el('languageSelect').selectOption('en');
   assert.equal(await el('mobileProperties').innerText(),'Tools');
   await click('mobileProperties'); await click('touchTheme'); await click('closeRight');
@@ -108,6 +119,10 @@ try {
   assert.notDeepEqual(rotated.camera,baseline.camera);
   assert.ok(Math.abs(radius(rotated)-radius(baseline))<0.02);
   assert.deepEqual(rotated.target,baseline.target);
+  await page.evaluate(()=>Object.defineProperty(screen.orientation,'angle',{configurable:true,value:90}));
+  const turn=await diag();
+  await tilt(70,20);
+  assert.deepEqual((await diag()).camera,turn.camera,'Screen orientation recalibrates in place');
   await click('gyroCenter');
   const recentered=await diag(); await tilt(80);
   assert.deepEqual((await diag()).camera,recentered.camera);
@@ -134,7 +149,12 @@ try {
   await click('gyroToggle');
   await page.waitForFunction(()=>document.querySelector('#gyroStatus').textContent==='No sensor data · touch available');
   await click('exitInspection');
-  console.log('PASS denied permission and silent sensor');
+  await page.waitForFunction(()=>!history.state?.cadviewImmersive);
+  await click('mobileFullscreen');
+  await page.goBack();
+  await page.waitForFunction(()=>!document.body.classList.contains('immersive'));
+  assert.ok((await diag()).renderTriangles>0);
+  console.log('PASS denied permission, silent sensor and browser Back');
 
   if(process.env.CADVIEW_STEP){
     const file=process.env.CADVIEW_STEP;
@@ -149,6 +169,19 @@ try {
       return n;
     }
     const count=await importStep();
+    await click('mobileFullscreen');
+    await click('mobileTree');
+    await rows.nth(1).click();
+    await click('selectedPartChip');
+    await click('touchHide');
+    await click('touchUndo');
+    await click('touchFocus');
+    await click('mobileProperties');
+    await click('touchSection');
+    await el('sectionRange').press('ArrowRight');
+    await click('closeRight');
+    await click('exitInspection');
+    assert.equal(await el('fileName').textContent(),basename(file));
     await context.setOffline(true);
     await page.reload();
     await page.waitForFunction(()=>document.querySelector('#fileName').textContent.includes('Demo'));

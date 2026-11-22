@@ -83,3 +83,7 @@
   .inspection .sidebar-left .left-bottom, .inspection .sidebar-left .tree-scroll { flex-shrink:0 }
   .inspection .sidebar-left .tree-scroll { max-height:50dvh; overflow:auto }
 }
+#drawerTools { display:none }
+@media (min-width:761px) and (max-width:1160px) {
+  body:not(.inspection) #drawerTools { display:inline-flex }
+}
