@@ -1,0 +1,137 @@
+/* CADVIEW surfaces use the workbench palette in desktop and inspection mode. */
+:root[data-theme] {
+  --bg: var(--sl-bg);
+  --panel: var(--sl-panel);
+  --panel2: var(--sl-sage-2);
+  --line: var(--sl-line);
+  --text: var(--sl-text);
+  --muted: var(--sl-muted);
+  --cyan: var(--sl-accent-text);
+  --cyan-deep: var(--sl-selection);
+  --soft: var(--sl-sage-2);
+  --cad-accent: var(--sl-accent-text);
+  --cad-canvas: var(--sl-bg-2);
+  --inspect-surface: var(--sl-panel);
+  --inspect-chrome: var(--sl-bg);
+  --inspect-text: var(--sl-text);
+  --inspect-accent: var(--sl-accent-text);
+  --inspect-line: var(--sl-line-2);
+}
+
+:root[data-theme] :is(.viewport-shell, .canvas-area) { background: var(--cad-canvas); }
+
+:root[data-theme] :is(.viewport-toolbar, .viewport-bottom, .mobile-bottom-bar,
+  .export-menu, .help-dialog, .welcome-tips, .inspection-head) {
+  background: var(--sl-panel);
+  color: var(--sl-text);
+  border-color: var(--sl-line);
+}
+
+:root[data-theme] .viewport-bottom {
+  color: var(--sl-muted);
+  font: 500 11px var(--sl-font-mono);
+}
+
+:root[data-theme] :is(.file-card, .inspector-head, .view-toggle, .inspector-tabs,
+  .dimensions > div, .count-pill, .unit-tag) {
+  background: var(--sl-sage-2);
+  border-color: var(--sl-line);
+  color: var(--sl-text);
+}
+
+:root[data-theme] :is(.file-icon, .mini-preview) {
+  background: var(--sl-sage);
+  color: var(--sl-accent-text);
+}
+
+:root[data-theme] :is(.eyebrow, .section-top, .panel-label-row) {
+  color: var(--sl-muted);
+  font: 500 11px var(--sl-font-mono);
+  letter-spacing: .07em;
+}
+
+:root[data-theme] :is(.file-text span, .inspector-head div span, .field-label,
+  .small-sub, .dimension-note, .range-row, .control-item span, .dimensions span,
+  .tree-arrow, .tree-eye, .tree-symbol, .export-menu span, .axis-title,
+  .viewport-hint, .input-feedback) { color: var(--sl-muted); }
+
+:root[data-theme] :is(.dimensions strong, .control-item strong, .export-menu button,
+  .view-toggle button) { color: var(--sl-text); }
+
+:root[data-theme] :is(.viewport-reset, .toolbar-btn, .quick-grid button, .panel-action,
+  .tree-tools button, .tree-tools input, .right-scroll select, .right-scroll input,
+  .export-select select, .camera-tools button, .lang-control, .icon-button, .axis-mode) {
+  background: var(--sl-panel);
+  color: var(--sl-text);
+  border-color: var(--sl-line-2);
+  border-radius: var(--sl-radius-s);
+}
+
+:root[data-theme] :is(.tree-node, .export-menu button, .viewport-reset, .toolbar-btn,
+  .quick-grid button, .panel-action, .inspector-tab):hover {
+  background: var(--sl-sage-2);
+}
+
+:root[data-theme] :is(.tree-node.selected, .view-toggle button.active, .toolbar-btn.active,
+  .inspector-tab.active, .part-hud [aria-expanded="true"]) {
+  background: var(--sl-selection);
+  color: var(--sl-accent-text);
+  border-color: var(--sl-accent);
+}
+
+:root[data-theme] :is(.viewport-shell, .app) .primary-action,
+:root[data-theme] #emptyOpen {
+  background: var(--sl-primary);
+  border-color: var(--sl-primary);
+  color: var(--sl-primary-text);
+}
+
+:root[data-theme] :is(.panel-divider, .top-sep) { background: var(--sl-line); }
+:root[data-theme] :is(.quick-grid button span, .text-button, .range-row output,
+  .control-item output, .tree-symbol.mesh) { color: var(--sl-accent-text); }
+:root[data-theme] input[type="range"] { accent-color: var(--sl-accent); }
+:root[data-theme] .switch input:checked + span { background: var(--sl-accent); }
+:root[data-theme] .switch input:focus-visible + span { outline: 2px solid var(--sl-focus); outline-offset: 2px; }
+
+:root[data-theme] .privacy-note {
+  color: var(--sl-ok);
+  background: var(--sl-st-stable-bg);
+  border-color: var(--sl-line);
+}
+
+:root[data-theme] .privacy-note div span { color: var(--sl-muted); }
+:root[data-theme] :is(.online-indicator, .status-dot) { background: var(--sl-ok); }
+
+:root[data-theme] :is(.loading-overlay, .empty-overlay, .drop-overlay) {
+  background: color-mix(in srgb, var(--sl-bg) 95%, transparent);
+  color: var(--sl-text);
+}
+
+:root[data-theme] :is(.loading-overlay p, .empty-overlay p, .drop-inner p) { color: var(--sl-muted); }
+:root[data-theme] :is(.measure-label, .toast, .empty-glyph) {
+  color: var(--sl-text);
+  background: var(--sl-panel);
+  border-color: var(--sl-line-2);
+}
+
+:root[data-theme] .toast.error { color: var(--sl-error); }
+:root[data-theme] .loader { border-color: var(--sl-line); border-top-color: var(--sl-accent); }
+:root[data-theme] .inspection,
+:root[data-theme] .inspection :is(.mobile-bottom-bar button, .inspection-head button, .inspection-actions button) {
+  font-family: var(--sl-font-sans);
+}
+
+@media (max-width: 400px) {
+  .inspection .sl-workbench-header .brand { flex-shrink: 0; }
+}
+
+:root[data-theme] .inspection .sidebar { border-color: var(--sl-line-2); }
+
+:root[data-theme] :is(.viewport-hint, .input-feedback, .axis-title) {
+  font-family: var(--sl-font-mono);
+}
+
+@media (max-width: 1160px) {
+  .sl-workbench-header .sl-status { display: none; }
+  .sl-workbench-header .brand { min-width: 0; }
+}

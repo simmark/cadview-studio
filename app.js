@@ -16,9 +16,7 @@ const canvas = $('cadCanvas');
 const interactionSurface = $('cadInteractionLayer') || canvas;
 const viewport = $('canvasArea');
 const scene = new THREE.Scene();
-const darkColor = new THREE.Color('#101d2b');
-const lightColor = new THREE.Color('#dce5eb');
-scene.background = darkColor;
+scene.background = new THREE.Color('#0d1412');
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1e8);
 camera.up.set(0, 0, 1);
 camera.position.set(160, -190, 140);
@@ -42,7 +40,8 @@ scene.add(new THREE.HemisphereLight(0xbfe8ff, 0x384555, 2.2));
 const keyLight = new THREE.DirectionalLight(0xffffff, 2.65); keyLight.position.set(75, -85, 140); scene.add(keyLight);
 const fillLight = new THREE.DirectionalLight(0x80cbd2, 1.6); fillLight.position.set(-100, 100, 95); scene.add(fillLight);
 const backLight = new THREE.DirectionalLight(0xffffff, 0.85); backLight.position.set(-40, 25, -50); scene.add(backLight);
-const grid = new THREE.GridHelper(1000, 60, 0x365667, 0x273a49);
+const grid = new THREE.GridHelper(1000, 60, 0x4b5d53, 0x2c3932);
+grid.material.transparent = true;
 grid.rotation.x = Math.PI / 2;
 grid.position.z = -8;
 scene.add(grid);
@@ -573,7 +572,7 @@ function showEdges(enabled){
   m.forEach(mesh=>{
     if(enabled&&!edgesByMesh.has(mesh)){
       try{
-        const edge=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry,25),new THREE.LineBasicMaterial({color:lightBackground?0x2a4050:0x8dabb7,transparent:true,opacity:.46,depthWrite:false}));
+        const edge=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry,25),new THREE.LineBasicMaterial({color:lightBackground?0x3a4a40:0x9db2a7,transparent:true,opacity:.46,depthWrite:false}));
         edge.renderOrder=2;mesh.add(edge);edgesByMesh.set(mesh,edge);
       }catch(err){console.warn('Kantengenerierung:',err)}
     }
@@ -1407,10 +1406,11 @@ function setLightTheme(light){
   document.documentElement.dataset.theme=lightTheme?'light':'dark';
   $('lightBackgroundToggle').checked=lightTheme;
   {const tb=$('themeButton'),en=language()==='en';tb.classList.toggle('is-light',lightTheme);const deLabel=lightTheme?'Dunkles Design':'Helles Design',label=en?({'Helles Design':'Light theme','Dunkles Design':'Dark theme'})[deLabel]:deLabel;tb.dataset.cadOriginaltitle=deLabel;tb.dataset.cadOriginalariaLabel=deLabel;tb.title=label;tb.setAttribute('aria-label',label);}
-  $('appThemeColor').content=lightTheme?'#f5f8fb':'#0b121e';
-  scene.background=lightTheme?lightColor:darkColor;
+  const palette = getComputedStyle(document.documentElement);
+  $('appThemeColor').content = palette.getPropertyValue('--sl-bg').trim();
+  scene.background.set(palette.getPropertyValue('--cad-canvas').trim());
   grid.material.opacity=lightTheme?.3:1;
-  getMeshes(modelRoot).forEach(m=>{if(edgesByMesh.has(m))edgesByMesh.get(m).material.color.set(lightTheme?'#294658':'#8dabb7')});
+  getMeshes(modelRoot).forEach(m=>{if(edgesByMesh.has(m))edgesByMesh.get(m).material.color.set(lightTheme?'#3a4a40':'#9db2a7')});
   try{localStorage.setItem('cadview-theme',lightTheme?'light':'dark')}catch{}
   renderNow('theme changed');
 }
