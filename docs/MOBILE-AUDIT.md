@@ -2,7 +2,7 @@
 
 ## Ausgangspunkt und Bedienkonzept
 
-CADVIEW main 5ff9e6c (Beta 1.5.0), SIMONLATION-Website main 9264c8e (hub.css). Der Viewer läuft als statische ES-Modul-App. app.js besitzt Kamera, Z-Hochachse, Picking, Messpunkte, Materialien und Exporte. gui.js schaltet Inspektor-Tabs. Das Manifest hat die eigene ID und den Scope /cadview-studio/. Der Worker lädt OCCT zunächst vom eigenen Ursprung. Bei einem Fehler versucht die bisherige Version zwei CDNs für die Engine. Modelle werden dem Worker lokal übergeben.
+CADVIEW main 5ff9e6c (Beta 1.5.0), SIMONLATION-Website main 9264c8e (assets/hub.css, index.html, README.md und die CADVIEW-Iconreferenz). Der Viewer läuft als statische ES-Modul-App. app.js besitzt Kamera, Z-Hochachse, Picking, Messpunkte, Materialien und Exporte. gui.js schaltet Inspektor-Tabs. Das Manifest hat die eigene ID und den Scope /cadview-studio/. Der Worker lädt OCCT zunächst vom eigenen Ursprung. Bei einem Fehler versucht die bisherige Version zwei CDNs für die Engine. Modelle werden dem Worker lokal übergeben.
 
 | Ansicht | Befund im Ausgangscode | Ziel für den ersten Branch |
 | --- | --- | --- |
@@ -48,3 +48,5 @@ Die Vergleichsbilder stammen aus Chromium/SwiftShader. Die beiden Läufe dokumen
 - [Referenzlauf mit unverändertem Anwendungscode](https://github.com/simmark/cadview-studio/actions/runs/45020562571)
 - [Erster Lauf mit mobiler Oberfläche](https://github.com/simmark/cadview-studio/actions/runs/45020836257)
 - [WebGL, mobile Interaktion und Offline-STEP](https://github.com/simmark/cadview-studio/actions/runs/45020936509)
+
+Aktueller Prüfnachweis und reale Geräteabnahme stehen im [QA-Testprotokoll](../QA-TESTPROTOKOLL.md). Die Browser- und Controller-Suites für den Code-Commit 89933e1 liefen am 22. November 2026 unter dem Pages-Pfad /cadview-studio/ erfolgreich durch.
