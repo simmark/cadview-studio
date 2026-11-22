@@ -3,8 +3,10 @@ name: CADVIEW browser WebGL smoke test
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/mobile-immersive-cadview]
     paths:
+      - mobile/**
+      - tests/*.mjs
       - app.js
       - index.html
       - rework.css
@@ -33,6 +35,12 @@ jobs:
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/cadview-http.log 2>&1 &
           sleep 3
+      - name: Capture reference viewports
+        run: node tests/layout-screens.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cadview-layout
+          path: artifacts/layout/
       - name: Validate live 3D interactions
         env:
           CADVIEW_URL: http://127.0.0.1:8765/
