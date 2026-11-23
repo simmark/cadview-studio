@@ -1,5 +1,5 @@
 /* CADVIEW Studio PWA 1.5.0. Same-origin shell incl. bundled three.js; OCCT engine cached on first use; CDN only as fallback. */
-const VERSION = 'cadview-studio-workbench-v1';
+const VERSION = 'cadview-studio-workbench-glb1';
 const RUNTIME = 'cadview-deps-1.5.0';
 const APP_FILES = [
   './assets/sl/fonts.css?v=sl1',
@@ -33,7 +33,7 @@ const APP_FILES = [
   './styles.css?v=1.2.0',
   './enhancements.css?v=1.3.0',
   './rework.css?v=1.5.0',
-  './app.js?v=sl1',
+  './app.js?v=glb1',
   './gui.js?v=m2',
   './mobile/inspection.js?v=m2',
   './mobile/touch.js?v=m2',

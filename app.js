@@ -10,6 +10,7 @@ import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import {installTouch} from './mobile/touch.js?v=m2';
 import {installInspection} from './mobile/inspection.js?v=m2';
 
+const MM_PER_METER = 1000;
 const $ = (id) => document.getElementById(id);
 const canvas = $('cadCanvas');
 // Separate interactive pointer layer above the WebGL canvas.
@@ -345,10 +346,11 @@ function repositionGrid(){
   const b=contentBounds(modelRoot);
   if(b.isEmpty())return;
   const s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
-  grid.position.set(c.x,c.y,b.min.z-Math.max(s.z*.04,2));
-  grid.scale.setScalar(Math.max(s.x,s.y,s.z)/320 ||1);
+  const span=Math.max(s.x,s.y,s.z)||1;
+  grid.position.set(c.x,c.y,b.min.z-Math.max(s.z*.04,span*.005));
+  grid.scale.setScalar(span/320);
   axes.position.set(b.min.x-s.x*.12,b.min.y-s.y*.12,grid.position.z);
-  axes.scale.setScalar(Math.max(s.x,s.y,s.z)/155||1);
+  axes.scale.setScalar(span/155);
 }
 function contentBounds(root){
   const b=new THREE.Box3(); if(!root)return b;
@@ -621,10 +623,9 @@ function updateExplode(){
     const dir=partCenter.sub(center);
     if(dir.lengthSq()<1e-6){const a=2*Math.PI*i/Math.max(1,explodeNodes.length);dir.set(Math.cos(a),Math.sin(a),.22)}
     dir.normalize();
-    // Transform world offset into local parent frame (CAD node rotations are typically identity).
-    const parentQ=new THREE.Quaternion();n.obj.parent.getWorldQuaternion(parentQ);
-    dir.applyQuaternion(parentQ.invert());
-    n.obj.position.copy(basePositions.get(n.obj)||new THREE.Vector3()).add(dir.multiplyScalar(scale));
+    // Map the world-space displacement into the parent's local frame, including scale.
+    const worldOrigin=n.obj.getWorldPosition(new THREE.Vector3());
+    n.obj.position.copy(n.obj.parent.worldToLocal(worldOrigin.addScaledVector(dir,scale)));
   });
   modelRoot.updateWorldMatrix(true,true);
   refreshSelectionBox();
@@ -751,9 +752,15 @@ async function loadMeshFile(file,ext){
       const loader=new GLTFLoader();
       loaded=(await loader.loadAsync(objectUrl)).scene;
     }
-    resetModel();currentFilename=file.name;currentUnit=['glb','gltf'].includes(ext)?'m':'Einheiten';
-    // Z-up convention: glTF/OBJ usually Y-up, unlike CAD/STL. Display geometry in Z-up.
-    if(ext==='glb'||ext==='gltf')loaded.rotation.x=Math.PI/2;
+    const isGltf=ext==='glb'||ext==='gltf';
+    resetModel();currentFilename=file.name;currentUnit=isGltf?'mm':'Einheiten';
+    if(isGltf){
+      // Convert glTF meters and Y-up to the CAD workspace's millimeters and Z-up.
+      // This unregistered scene transform keeps the editable mesh coordinates intact.
+      const toCad=new THREE.Matrix4().makeRotationX(Math.PI/2);
+      toCad.scale(new THREE.Vector3().setScalar(MM_PER_METER));
+      loaded.applyMatrix4(toCad);
+    }
     if(ext==='obj')loaded.traverse(o=>{if(o.isMesh){const convert=m=>simpleMaterial(m.color||'#a9baca',.2,.58);o.material=Array.isArray(o.material)?o.material.map(convert):convert(o.material);}});
     const root=new THREE.Group();root.name=file.name;modelRoot.add(root);const rn=registerNode(root,null,false);
     root.add(loaded);
@@ -790,9 +797,13 @@ async function exportModel(format){
     const grouping=$('exportGrouping').value;
     const output=format==='glb'&&grouping!=='original'?groupedForExport(grouping):clonedForExport();
     if(format==='glb'){
-      output.rotation.x=-Math.PI/2; // export a glTF-conformant Y-up model
-      output.scale.setScalar(currentUnit==='mm'?0.001:1); // glTF specifies meters; STEP/IGES is imported in mm
-      const result=await new GLTFExporter().parseAsync(output,{binary:true,onlyVisible:true,trs:false});
+      // Transform the entire exported assembly, including its existing pose and origin.
+      const gltfFrame=new THREE.Group();
+      gltfFrame.rotation.x=-Math.PI/2;
+      // Unitless STL/OBJ sources retain the existing assumption of 1 m per model unit.
+      gltfFrame.scale.setScalar(currentUnit==='mm'?1/MM_PER_METER:1);
+      gltfFrame.add(output);
+      const result=await new GLTFExporter().parseAsync(gltfFrame,{binary:true,onlyVisible:true,trs:false});
       download(new Blob([result],{type:'model/gltf-binary'}),filenameStem()+'.glb');
     }else if(format==='stl'){
       const result=new STLExporter().parse(output,{binary:true});
@@ -983,16 +994,16 @@ function rotateActive(axis,angle,silent=false){
 }
 function nHasAncestor(n,possibleParent){for(let p=n.parent;p;p=p.parent)if(p===possibleParent)return true;return false}
 function readTransform(o){return {position:o.position.toArray(),quaternion:o.quaternion.toArray(),scale:o.scale.toArray()}}
-function writeTransform(o,data){
+function writeTransform(o,data,positionScale=1){
   if(!data||data.position?.length!==3||data.quaternion?.length!==4||data.scale?.length!==3)return;
   if(![...data.position,...data.quaternion,...data.scale].every(Number.isFinite))return;
-  o.position.fromArray(data.position);o.quaternion.fromArray(data.quaternion);o.scale.fromArray(data.scale);o.updateMatrix();
+  o.position.fromArray(data.position).multiplyScalar(positionScale);o.quaternion.fromArray(data.quaternion);o.scale.fromArray(data.scale);o.updateMatrix();
 }
 function saveRotationPreset(){
   const name=$('rotationPresetName').value.trim().slice(0,80);
   if(!name){toast('Bitte einen Namen für die Vorlage eingeben.');return}
   const presets=JSON.parse(localStorage.getItem('cadview-rotations')||'{}');
-  presets[name]={root:readTransform(modelRoot),nodes:allNodes.map(n=>({id:n.id,transform:readTransform(n.obj)})),stepTransform:stepGlobalTransform.toArray(),stepCompatible:stepExportCompatible};
+  presets[name]={unit:currentUnit,root:readTransform(modelRoot),nodes:allNodes.map(n=>({id:n.id,transform:readTransform(n.obj)})),stepTransform:stepGlobalTransform.toArray(),stepCompatible:stepExportCompatible};
   localStorage.setItem('cadview-rotations',JSON.stringify(presets));loadRotationPresets();$('rotationPresetList').value=name;
   toast('Drehvorlage „'+name+'“ gespeichert.');
 }
@@ -1017,11 +1028,16 @@ function applyRotationPreset(){
   if(!d){toast('Vorlage auswählen.',true);return}
   if(d.nodes.length!==allNodes.length){toast('Vorlage gehört zu einer anderen Bauteilstruktur.',true);return}
   if(explodeFactor){$('explodeRange').value=0;updateExplode()}
-  writeTransform(modelRoot,d.root);
-  d.nodes.forEach((record,i)=>{writeTransform(allNodes[i].obj,record.transform);basePositions.set(allNodes[i].obj,allNodes[i].obj.position.clone())});
+  const positionScale=d.unit==='m'&&currentUnit==='mm'?MM_PER_METER:1;
+  writeTransform(modelRoot,d.root,positionScale);
+  d.nodes.forEach((record,i)=>{
+    const node=allNodes[i];
+    writeTransform(node.obj,record.transform,node.parent?1:positionScale);
+    basePositions.set(node.obj,node.obj.position.clone());
+  });
   if(d.stepTransform?.length===16)stepGlobalTransform.fromArray(d.stepTransform);
   stepExportCompatible=Boolean(d.stepCompatible);
-  modelRoot.updateWorldMatrix(true,true);refreshSelectionBox();updateDimensions();updateSection();fitToObject(modelRoot);
+  modelRoot.updateWorldMatrix(true,true);refreshSelectionBox();updateDimensions();updateSection();repositionGrid();fitToObject(modelRoot);
   toast('Drehvorlage „'+name+'“ angewendet.');
 }
 function serialMaterial(m){return {name:m.name||'',color:'#'+m.color.getHexString(),metalness:m.metalness??0,roughness:m.roughness??1,opacity:m.opacity??1}}
@@ -1051,13 +1067,15 @@ function applyProject(data,auto=false){
   if(data.nodes.length!==allNodes.length)throw new Error(`Bauteilstruktur passt nicht (${data.nodes.length} statt ${allNodes.length} Elemente). Bitte zuerst das zugehörige CAD-Modell laden.`);
   if(!auto&&data.source!==currentFilename&&!confirm(`Die Konfiguration stammt von „${data.source}“. Trotzdem auf „${currentFilename}“ anwenden?`))return;
   if(explodeFactor){$('explodeRange').value=0;updateExplode();}
-  writeTransform(modelRoot,data.root);
+  // Older CADVIEW projects stored GLB/GLTF world-space positions in meters.
+  const positionScale=data.unit==='m'&&currentUnit==='mm'?MM_PER_METER:1;
+  writeTransform(modelRoot,data.root,positionScale);
   for(let i=0;i<data.nodes.length;i++){
     const row=data.nodes[i],node=allNodes[i];
     if(row.name!==node.obj.name)throw new Error('Projektteil-Namen stimmen nicht überein.');
     node.category=row.category||'Sonstige';node.obj.userData.category=node.category;
     node.obj.visible=row.visible!==false;
-    writeTransform(node.obj,row.transform);
+    writeTransform(node.obj,row.transform,node.parent?1:positionScale);
     basePositions.set(node.obj,node.obj.position.clone());
     const meshes=getMeshes(node.obj).filter(mesh=>closestNodeFromObject(mesh)===node);
     for(let j=0;j<meshes.length;j++){
@@ -1070,7 +1088,7 @@ function applyProject(data,auto=false){
   if(data.stepTransform?.length===16)stepGlobalTransform.fromArray(data.stepTransform);
   stepExportCompatible=Boolean(data.stepCompatible);
   clearSavedMeasurements();clearAutoDimensions();
-  for(const m of data.measurements||[])if(m.a?.length===3&&m.b?.length===3)addSavedMeasurement(new THREE.Vector3(...m.a),new THREE.Vector3(...m.b),m.label||'Abstand',false);
+  for(const m of data.measurements||[])if(m.a?.length===3&&m.b?.length===3)addSavedMeasurement(new THREE.Vector3(...m.a).multiplyScalar(positionScale),new THREE.Vector3(...m.b).multiplyScalar(positionScale),m.label||'Abstand',false);
   if(data.section){
     const sec=data.section;clipEnabled=!!sec.enabled;
     $('sectionAxis').value=sec.axis||'z';$('sectionRange').value=sec.value||0;$('sectionInvert').checked=!!sec.invert;
@@ -1078,7 +1096,7 @@ function applyProject(data,auto=false){
     $('sectionRange').disabled=!clipEnabled;$('section2Range').disabled=!clipEnabled||!sec.secondary;
     $('sectionButton').classList.toggle('active',clipEnabled);$('sectionButton').setAttribute('aria-pressed',String(clipEnabled));
   }
-  modelRoot.updateWorldMatrix(true,true);modelRoot.traverse(applyFlagsToMesh);updateTree();selectNode(null);updateSection();fitToObject(modelRoot);refreshMeasurementDisplays();
+  modelRoot.updateWorldMatrix(true,true);modelRoot.traverse(applyFlagsToMesh);updateTree();selectNode(null);updateSection();repositionGrid();fitToObject(modelRoot);refreshMeasurementDisplays();
   if(data.lightTheme!==undefined)setLightTheme(data.lightTheme);
 }
 function materialDisplayName(mat){
@@ -1138,12 +1156,12 @@ function exportRotatedStep(){
 }
 
 function formatMeasured(raw){
-  let original=currentUnit==='mm'?'mm':currentUnit==='m'?'m':'Einheiten';
+  const original=currentUnit;
   const choice=$('measureUnits').value;
   if(choice==='original'||original==='Einheiten')return raw.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3,useGrouping:false})+' '+original;
-  const mm=original==='mm'?raw:raw*1000;
+  const mm=raw;
   const unit=choice;
-  const value=unit==='mm'?mm:unit==='cm'?mm/10:unit==='m'?mm/1000:mm/25.4;
+  const value=unit==='mm'?mm:unit==='cm'?mm/10:unit==='m'?mm/MM_PER_METER:mm/25.4;
   return value.toLocaleString(language()==='en'?'en-US':'de-DE',{maximumFractionDigits:3,useGrouping:false})+' '+(unit==='inch'?'in':unit);
 }
 // Rendered onto a high-resolution texture and scaled to constant screen pixels.
