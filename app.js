@@ -727,10 +727,11 @@ async function loadFile(file){
   finally{setLoading(false);$('fileInput').value='';}
 }
 async function parseWithWorker(file,format){
-  if(!worker){worker = new Worker('./occt-worker.js?v=1.5.0');worker.onerror = err=>{if(workerTask){workerTask.reject(new Error('CAD-Worker abgestürzt: '+(err.message||'Unbekannter Fehler')));workerTask=null}worker.terminate();worker=null};
+  if(!worker){worker = new Worker('./occt-worker.js?v=step-detail1');worker.onerror = err=>{if(workerTask){workerTask.reject(new Error('CAD-Worker abgestürzt: '+(err.message||'Unbekannter Fehler')));workerTask=null}worker.terminate();worker=null};
     worker.onmessage = e=>{const d=e.data;const task=workerTask;if(!task||task.id!==d.id)return;
       if(d.phase==='engine')setLoading(true,'CAD-Engine wird geladen …','Der OpenCascade-Parser wird beim ersten STEP/IGES-Import aus dem Internet geladen.');
       if(d.phase==='parsing')setLoading(true,'STEP/IGES wird konvertiert …','Die Originaldatei bleibt auf deinem Computer.');
+      if(d.phase==='refining')setLoading(true,language()==='en'?'Refining STEP surfaces …':'STEP-Oberflächen werden verfeinert …',language()==='en'?'Processing stays on your device.':'Die Verarbeitung bleibt auf deinem Gerät.');
       if(d.phase==='done'){workerTask=null;task.resolve(d.result)}
       if(d.phase==='error'){workerTask=null;task.reject(new Error(d.error))}
     };
