@@ -1,15 +1,15 @@
 /* CADVIEW Studio PWA 1.5.0. Same-origin shell incl. bundled three.js; OCCT engine cached on first use; CDN only as fallback. */
-const VERSION = 'cadview-studio-workbench-step-detail4';
+const VERSION = 'cadview-studio-workbench-step-detail5';
 const RUNTIME = 'cadview-deps-1.5.0';
 const APP_FILES = [
-  './assets/sl/fonts.css?v=sl4',
-  './assets/sl/tokens.css?v=sl4',
-  './assets/sl/app.css?v=sl4',
-  './assets/sl/workbench.css?v=sl4',
-  './workbench.css?v=sl4',
+  './assets/sl/fonts.css?v=sl5',
+  './assets/sl/tokens.css?v=sl5',
+  './assets/sl/app.css?v=sl5',
+  './assets/sl/workbench.css?v=sl5',
+  './workbench.css?v=sl5',
   './icons/icon.svg',
-  './assets/sl/brand/logo-dark.svg',
-  './assets/sl/brand/logo-light.svg',
+  './assets/sl/brand/wordmark-dark.svg',
+  './assets/sl/brand/wordmark-light.svg',
   './assets/sl/fonts/ibm-plex-mono-latin-400-normal.woff2',
   './assets/sl/fonts/ibm-plex-mono-latin-500-normal.woff2',
   './assets/sl/fonts/ibm-plex-mono-latin-ext-400-normal.woff2',
